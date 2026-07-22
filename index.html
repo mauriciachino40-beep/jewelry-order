@@ -362,6 +362,26 @@
     .confirm-btn-secondary { background: var(--bg); color: var(--primary); border: 1.5px solid var(--border); }
     .confirm-btn-success { background: #25D366; color: #fff; }
     .confirm-btn:active { transform: scale(0.97); }
+    .confirm-btn-print { background: #4a6fa5; color: #fff; }
+
+    /* ========== Print Styles ========== */
+    @media print {
+      body, html { background: #fff !important; padding: 0; margin: 0; }
+      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .confirm-icon, .checkout-header, .confirm-order-id { display: none !important; }
+      .confirm-modal { position: static; max-width: 100%; border: none; box-shadow: none; height: auto; }
+      .confirm-body { padding: 20px; text-align: left; }
+      .confirm-summary { font-size: 13px; line-height: 1.6; }
+      .confirm-summary table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+      .confirm-summary th { background: #f5f5f5; text-align: left; padding: 6px 8px; font-size: 12px; border-bottom: 2px solid #333; }
+      .confirm-summary td { padding: 6px 8px; font-size: 12px; border-bottom: 1px solid #ddd; }
+      .confirm-summary .text-right { text-align: right; }
+      .print-title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 4px; letter-spacing: 1px; text-transform: uppercase; }
+      .print-order-id { font-size: 13px; text-align: center; color: #666; margin-bottom: 16px; }
+      .print-section { margin-bottom: 14px; }
+      .print-section h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+      .print-section p { font-size: 12px; margin: 0; line-height: 1.5; }
+      .print-total { font-size: 16px; font-weight: 700; text-align: right; margin-top: 10px; border-top: 2px solid #333; padding-top: 6px; }
+    }
 
     /* ========== Toast ========== */
     .toast {
@@ -520,6 +540,7 @@
       <div class="confirm-order-id" id="confirmOrderId"></div>
       <div class="confirm-summary" id="confirmSummary"></div>
       <div class="confirm-actions">
+        <button class="confirm-btn confirm-btn-print" onclick="printOrder()">🖨️ Print / Save PDF</button>
         <button class="confirm-btn confirm-btn-success" onclick="shareWhatsApp()">💬 Share via WhatsApp</button>
         <button class="confirm-btn confirm-btn-primary" onclick="copyOrderText()">📋 Copy Order Text</button>
         <button class="confirm-btn confirm-btn-secondary" onclick="newOrder()">Start New Order</button>
@@ -1138,18 +1159,36 @@
       document.getElementById('confirmOrderId').textContent = `Order #${data.orderId} · ${data.date} (ET)`;
 
       const addr = [data.customer.address, data.customer.apt, `${data.customer.city}, ${data.customer.state} ${data.customer.zip}`].filter(Boolean).join(', ');
-      const itemsText = data.items.map((it, i) => {
+
+      // 屏幕显示 + 打印表格
+      const itemsRows = data.items.map((it, i) => {
         const vt = Object.entries(it.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
-        return `${i+1}. ${it.name} (${vt}) × ${it.quantity} = $${it.subtotal.toFixed(2)}`;
-      }).join('<br>');
+        return { num: i+1, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
+      });
+      const itemsTableHTML = `
+        <table>
+          <thead><tr><th>#</th><th>Product</th><th>Options</th><th>Qty</th><th>Price</th><th class="text-right">Subtotal</th></tr></thead>
+          <tbody>${itemsRows.map(r => `<tr><td>${r.num}</td><td>${r.name}</td><td style="font-size:11px;color:#888">${r.variants}</td><td>×${r.qty}</td><td>$${r.price.toFixed(2)}</td><td class="text-right">$${r.subtotal.toFixed(2)}</td></tr>`).join('')}</tbody>
+        </table>`;
+      const itemsText = itemsRows.map(r => `${r.num}. ${r.name} (${r.variants}) × ${r.qty} = $${r.subtotal.toFixed(2)}`).join('<br>');
 
       document.getElementById('confirmSummary').innerHTML = `
         <strong>Order #${data.orderId}</strong><br>
         <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
         <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>📧 ${data.customer.email}<br>
         ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
-        <strong>🛒 Items:</strong><br>${itemsText}<br><br>
+        ${itemsTableHTML}<br>
         <strong>💰 Total: $${data.total.toFixed(2)}</strong>`;
+
+      // 打印版内容
+      const printHTML = `
+        <div class="print-title">Jewelry Wholesale Order</div>
+        <div class="print-order-id">Order #${data.orderId} · ${data.date} (ET)</div>
+        <div class="print-section"><h4>📦 SHIP TO</h4><p>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>📧 ${data.customer.email}</p></div>
+        ${data.notes ? `<div class="print-section"><h4>📝 NOTES</h4><p>${data.notes}</p></div>` : ''}
+        <div class="print-section"><h4>🛒 ORDER ITEMS</h4>${itemsTableHTML}</div>
+        <div class="print-total">TOTAL: $${data.total.toFixed(2)}</div>`;
+      window._printHTML = printHTML;
 
       window._lastOrder = data;
       window._lastOrderText = [
@@ -1171,6 +1210,14 @@
         ``,
         `💰 *Total: $${data.total.toFixed(2)}*`
       ].filter(Boolean).join('\n');
+    }
+
+    function printOrder() {
+      if (!window._printHTML) return;
+      const orig = document.getElementById('confirmSummary').innerHTML;
+      document.getElementById('confirmSummary').innerHTML = window._printHTML;
+      window.print();
+      document.getElementById('confirmSummary').innerHTML = orig;
     }
 
     function shareWhatsApp() {
