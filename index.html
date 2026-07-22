@@ -1061,34 +1061,44 @@
       return true;
     }
 
-    function submitOrder() {
+    async function submitOrder() {
       if (!validateForm()) return;
       const btn = document.getElementById('submitBtn');
       btn.textContent = 'Processing...'; btn.classList.add('loading');
 
-      setTimeout(() => {
-        const orderId = 'ORD-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
-        const orderData = {
-          orderId,
-          date: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
-          customer: {
-            name: document.getElementById('inputName').value.trim(),
-            phone: document.getElementById('inputPhone').value.trim(),
-            address: document.getElementById('inputAddress').value.trim(),
-            apt: document.getElementById('inputApt').value.trim(),
-            city: document.getElementById('inputCity').value.trim(),
-            state: document.getElementById('inputState').value,
-            zip: document.getElementById('inputZip').value.trim(),
-          },
-          items: cart.map(i => ({
-            name: i.name, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity
-          })),
-          total: getCartTotal(),
-          notes: document.getElementById('inputNotes').value.trim()
-        };
-        showConfirmation(orderData);
-        btn.textContent = 'Place Order'; btn.classList.remove('loading');
-      }, 600);
+      const orderId = 'ORD-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+      const orderData = {
+        orderId,
+        date: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
+        customer: {
+          name: document.getElementById('inputName').value.trim(),
+          phone: document.getElementById('inputPhone').value.trim(),
+          address: document.getElementById('inputAddress').value.trim(),
+          apt: document.getElementById('inputApt').value.trim(),
+          city: document.getElementById('inputCity').value.trim(),
+          state: document.getElementById('inputState').value,
+          zip: document.getElementById('inputZip').value.trim(),
+        },
+        items: cart.map(i => ({
+          name: i.name, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity
+        })),
+        total: getCartTotal(),
+        notes: document.getElementById('inputNotes').value.trim()
+      };
+
+      // 发送订单邮件到你邮箱（Formspree）
+      try {
+        await fetch('https://formspree.io/f/mzdnabyj', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData)
+        });
+      } catch (e) {
+        console.log('Email send failed, but order still generated');
+      }
+
+      showConfirmation(orderData);
+      btn.textContent = 'Place Order'; btn.classList.remove('loading');
     }
 
     function showConfirmation(data) {
