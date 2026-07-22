@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Jewelry Wholesale Order</title>
+  <style>
+    /* ========== Reset & Variables ========== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary: #1a1a2e;
+      --accent: #c8956b;
+      --accent-light: #f5ebe0;
+      --bg: #f7f5f2;
+      --card-bg: #ffffff;
+      --text: #2c2c2c;
+      --text-light: #7a7a7a;
+      --border: #e8e4df;
+      --danger: #d45b4a;
+      --success: #5b8c5a;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+      --radius: 12px;
+      --radius-sm: 8px;
+      --transition: 0.2s ease;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 80px;
+    }
+
+    /* ========== Header ========== */
+    .header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-sm);
+    }
+    .header-brand { font-size: 18px; font-weight: 700; color: var(--primary); letter-spacing: -0.3px; }
+    .header-brand span { color: var(--accent); }
+    .cart-btn {
+      position: relative; background: none; border: none; cursor: pointer;
+      padding: 8px; border-radius: 50%; transition: background var(--transition);
+    }
+    .cart-btn:hover { background: var(--accent-light); }
+    .cart-btn svg { width: 24px; height: 24px; color: var(--primary); }
+    .cart-badge {
+      position: absolute; top: 2px; right: 2px;
+      background: var(--danger); color: #fff; font-size: 11px; font-weight: 700;
+      min-width: 18px; height: 18px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cart-badge:empty { display: none; }
+    .cart-badge.bump { animation: bump 0.3s ease; }
+    @keyframes bump {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.3); }
+    }
+
+    /* ========== Category Tabs ========== */
+    .category-tabs {
+      display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .category-tabs::-webkit-scrollbar { display: none; }
+    .category-tab {
+      flex-shrink: 0; padding: 8px 18px; border-radius: 20px;
+      font-size: 14px; font-weight: 500; border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--text-light); cursor: pointer;
+      transition: all var(--transition); white-space: nowrap;
+    }
+    .category-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* ========== Product Grid ========== */
+    .product-grid {
+      display: grid; grid-template-columns: 1fr; gap: 16px; padding: 0 16px;
+    }
+    @media (min-width: 640px) { .product-grid { grid-template-columns: 1fr 1fr; } }
+    @media (min-width: 960px) { .product-grid { grid-template-columns: 1fr 1fr 1fr; max-width: 1000px; margin: 0 auto; } }
+
+    /* ========== Product Card ========== */
+    .product-card {
+      background: var(--card-bg); border-radius: var(--radius); overflow: hidden;
+      box-shadow: var(--shadow-sm); transition: box-shadow var(--transition);
+    }
+    .product-card:hover { box-shadow: var(--shadow); }
+
+    /* 🖼️ 图片框架 — 替换图片只需改 src 属性 */
+    .product-image-wrap {
+      position: relative; width: 100%; aspect-ratio: 1 / 1;
+      background: #f0ece6; overflow: hidden; cursor: default;
+    }
+    .product-image-wrap img {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .product-image-placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #bbb; font-size: 14px; text-align: center; padding: 20px;
+    }
+
+    .product-info { padding: 14px 16px 16px; }
+    .product-name {
+      font-size: 16px; font-weight: 600; color: var(--primary);
+      margin-bottom: 4px; line-height: 1.3;
+    }
+    .product-price {
+      font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 12px;
+    }
+    .product-price .unit { font-size: 12px; font-weight: 400; color: var(--text-light); margin-left: 2px; }
+
+    /* Variant groups */
+    .variant-group { margin-bottom: 10px; }
+    .variant-label {
+      font-size: 12px; font-weight: 600; color: var(--text);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px;
+    }
+    .variant-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .variant-option {
+      padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 20px;
+      font-size: 13px; cursor: pointer; transition: all var(--transition);
+      background: var(--card-bg); user-select: none; font-weight: 500;
+      white-space: nowrap;
+    }
+    .variant-option.long-text {
+      white-space: normal; text-align: center; min-width: 60px;
+    }
+    .variant-option.selected {
+      border-color: var(--accent); background: var(--accent-light); color: var(--accent); font-weight: 700;
+    }
+    .variant-option.color-option {
+      min-width: 48px; text-align: center; font-weight: 600;
+    }
+
+    /* 🔢 QTY 数量按钮 */
+    .qty-group { margin-bottom: 10px; }
+    .qty-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .qty-option {
+      width: 38px; height: 38px; border: 1.5px solid var(--border); border-radius: 50%;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all var(--transition); background: var(--card-bg);
+      display: flex; align-items: center; justify-content: center; user-select: none;
+    }
+    .qty-option.selected {
+      border-color: var(--accent); background: var(--accent); color: #fff;
+    }
+
+    /* Add to cart button */
+    .add-to-cart-btn {
+      width: 100%; padding: 12px; margin-top: 4px;
+      background: var(--accent); color: #fff; border: none; border-radius: 24px;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      transition: all var(--transition);
+    }
+    .add-to-cart-btn:hover { filter: brightness(1.08); }
+    .add-to-cart-btn:active { transform: scale(0.97); }
+    .add-to-cart-btn.added { background: var(--success); }
+
+    /* ========== Bottom Cart Bar ========== */
+    .cart-bar {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+      background: var(--card-bg); border-top: 1px solid var(--border);
+      padding: 10px 16px; display: flex; align-items: center; justify-content: space-between;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.06);
+    }
+    .cart-bar-info { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .cart-bar-icon {
+      position: relative; width: 40px; height: 40px;
+      background: var(--accent-light); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cart-bar-icon svg { width: 22px; height: 22px; color: var(--accent); }
+    .cart-bar-count {
+      position: absolute; top: -2px; right: -2px;
+      background: var(--danger); color: #fff; font-size: 10px; font-weight: 700;
+      min-width: 16px; height: 16px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cart-bar-count:empty { display: none; }
+    .cart-bar-text { font-size: 13px; color: var(--text-light); }
+    .cart-bar-total { font-size: 16px; font-weight: 700; color: var(--primary); }
+    .cart-bar-btn {
+      padding: 12px 24px; background: var(--accent); color: #fff; border: none;
+      border-radius: 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all var(--transition);
+    }
+    .cart-bar-btn:hover { filter: brightness(1.08); }
+    .cart-bar-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* ========== Overlay ========== */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 300;
+      opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+    }
+    .overlay.show { opacity: 1; pointer-events: auto; }
+
+    /* ========== Cart Panel ========== */
+    .cart-panel {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 400;
+      background: var(--card-bg); border-radius: 20px 20px 0 0;
+      box-shadow: var(--shadow-lg); max-height: 75vh;
+      display: flex; flex-direction: column;
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .cart-panel.show { transform: translateY(0); }
+    .cart-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .cart-panel-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .cart-clear-btn { background: none; border: none; color: var(--danger); font-size: 13px; cursor: pointer; font-weight: 500; }
+    .cart-panel-close {
+      width: 32px; height: 32px; border: none; background: var(--bg);
+      border-radius: 50%; font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cart-items { overflow-y: auto; flex: 1; padding: 12px 20px; }
+    .cart-empty { text-align: center; padding: 40px 20px; color: var(--text-light); }
+    .cart-empty svg { width: 48px; height: 48px; color: #ddd; margin-bottom: 12px; }
+    .cart-item {
+      display: flex; gap: 12px; padding: 12px 0;
+      border-bottom: 1px solid var(--border); align-items: flex-start;
+    }
+    .cart-item:last-child { border-bottom: none; }
+    .cart-item-image {
+      width: 64px; height: 64px; border-radius: var(--radius-sm);
+      object-fit: cover; flex-shrink: 0; background: #f0ece6;
+    }
+    .cart-item-details { flex: 1; min-width: 0; }
+    .cart-item-name { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+    .cart-item-variants { font-size: 12px; color: var(--text-light); margin-bottom: 4px; }
+    .cart-item-price { font-size: 14px; font-weight: 600; color: var(--accent); }
+    .cart-item-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .cart-item-qty {
+      display: flex; align-items: center; border: 1.5px solid var(--border); border-radius: 18px; overflow: hidden;
+    }
+    .cart-qty-btn {
+      width: 28px; height: 28px; border: none; background: none;
+      font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .cart-qty-btn:hover { background: var(--accent-light); }
+    .cart-qty-input {
+      width: 36px; height: 28px; border: none;
+      border-left: 1.5px solid var(--border); border-right: 1.5px solid var(--border);
+      text-align: center; font-size: 13px; font-weight: 600;
+    }
+    .cart-item-remove { background: none; border: none; color: var(--danger); font-size: 12px; cursor: pointer; padding: 4px 8px; font-weight: 500; }
+    .cart-panel-footer { padding: 12px 20px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .cart-subtotal { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 16px; }
+    .cart-subtotal-label { color: var(--text-light); }
+    .cart-subtotal-value { font-weight: 700; color: var(--primary); }
+    .cart-checkout-btn {
+      width: 100%; padding: 14px; background: var(--accent); color: #fff;
+      border: none; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+    .cart-checkout-btn:hover { filter: brightness(1.08); }
+    .cart-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    /* ========== Checkout Modal ========== */
+    .checkout-modal {
+      position: fixed; inset: 0; z-index: 500; background: var(--bg);
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .checkout-modal.show { transform: translateX(0); }
+    .checkout-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      background: var(--card-bg); flex-shrink: 0;
+    }
+    .checkout-back-btn {
+      width: 32px; height: 32px; border: none; background: var(--bg);
+      border-radius: 50%; font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .checkout-header h2 { font-size: 18px; font-weight: 700; }
+    .checkout-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+    .checkout-section {
+      background: var(--card-bg); border-radius: var(--radius);
+      padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+    }
+    .checkout-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--primary); }
+
+    .form-group { margin-bottom: 12px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text); }
+    .form-label .required { color: var(--danger); }
+    .form-input, .form-select {
+      width: 100%; padding: 10px 14px; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+      transition: border-color var(--transition); background: var(--card-bg);
+      -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus { outline: none; border-color: var(--accent); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .form-row-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+
+    .checkout-items { font-size: 13px; }
+    .checkout-item-row {
+      display: flex; justify-content: space-between; padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .checkout-item-row:last-child { border-bottom: none; }
+    .checkout-item-name { flex: 1; }
+    .checkout-item-qty { color: var(--text-light); margin: 0 8px; white-space: nowrap; }
+    .checkout-item-subtotal { font-weight: 600; white-space: nowrap; }
+
+    .checkout-submit {
+      padding: 16px 20px 24px; border-top: 1px solid var(--border);
+      background: var(--card-bg); flex-shrink: 0;
+    }
+    .checkout-total-row { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+    .submit-btn {
+      width: 100%; padding: 14px; background: var(--accent); color: #fff;
+      border: none; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+    .submit-btn:hover { filter: brightness(1.08); }
+    .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .submit-btn.loading { opacity: 0.7; pointer-events: none; }
+
+    /* ========== Confirmation Modal ========== */
+    .confirm-modal {
+      position: fixed; inset: 0; z-index: 600; background: var(--bg);
+      transform: translateY(100%);
+      transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .confirm-modal.show { transform: translateY(0); }
+    .confirm-body { flex: 1; overflow-y: auto; padding: 20px; text-align: center; }
+    .confirm-icon {
+      width: 64px; height: 64px; background: #e8f5e9; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 20px auto 12px;
+    }
+    .confirm-icon svg { width: 32px; height: 32px; color: var(--success); }
+    .confirm-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+    .confirm-order-id { font-size: 13px; color: var(--text-light); margin-bottom: 20px; }
+    .confirm-summary {
+      background: var(--card-bg); border-radius: var(--radius); padding: 16px;
+      text-align: left; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+      font-size: 14px; line-height: 1.8;
+    }
+    .confirm-actions { display: flex; flex-direction: column; gap: 8px; }
+    .confirm-btn {
+      width: 100%; padding: 14px; border-radius: 25px; font-size: 15px;
+      font-weight: 600; cursor: pointer; border: none;
+    }
+    .confirm-btn-primary { background: var(--accent); color: #fff; }
+    .confirm-btn-secondary { background: var(--bg); color: var(--primary); border: 1.5px solid var(--border); }
+    .confirm-btn-success { background: #25D366; color: #fff; }
+    .confirm-btn:active { transform: scale(0.97); }
+
+    /* ========== Toast ========== */
+    .toast {
+      position: fixed; top: 20px; left: 50%;
+      transform: translateX(-50%) translateY(-120px); z-index: 999;
+      background: var(--primary); color: #fff; padding: 10px 20px;
+      border-radius: 20px; font-size: 14px; font-weight: 500;
+      box-shadow: var(--shadow-lg); transition: transform 0.3s ease; pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="header">
+    <div class="header-brand">Jewelry<span>Order</span></div>
+    <button class="cart-btn" onclick="openCart()" aria-label="View cart">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+      </svg>
+      <span class="cart-badge" id="cartBadge"></span>
+    </button>
+  </header>
+
+  <!-- ==================== CATEGORY TABS ==================== -->
+  <div class="category-tabs" id="categoryTabs"></div>
+
+  <!-- ==================== PRODUCT GRID ==================== -->
+  <div class="product-grid" id="productGrid"></div>
+
+  <!-- ==================== BOTTOM CART BAR ==================== -->
+  <div class="cart-bar" id="cartBar">
+    <div class="cart-bar-info" onclick="openCart()">
+      <div class="cart-bar-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+        <span class="cart-bar-count" id="cartBarCount"></span>
+      </div>
+      <div>
+        <div class="cart-bar-text" id="cartBarItems">0 items</div>
+        <div class="cart-bar-total" id="cartBarTotal">$0.00</div>
+      </div>
+    </div>
+    <button class="cart-bar-btn" id="cartBarBtn" disabled onclick="openCart()">View Cart</button>
+  </div>
+
+  <!-- ==================== OVERLAY ==================== -->
+  <div class="overlay" id="overlay" onclick="closeCart()"></div>
+
+  <!-- ==================== CART PANEL ==================== -->
+  <div class="cart-panel" id="cartPanel">
+    <div class="cart-panel-header">
+      <h2>🛒 Shopping Cart</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="cart-clear-btn" onclick="clearCart()">Clear All</button>
+        <button class="cart-panel-close" onclick="closeCart()">✕</button>
+      </div>
+    </div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="cart-panel-footer">
+      <div class="cart-subtotal">
+        <span class="cart-subtotal-label">Subtotal</span>
+        <span class="cart-subtotal-value" id="cartSubtotal">$0.00</span>
+      </div>
+      <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="openCheckout()">Proceed to Checkout</button>
+    </div>
+  </div>
+
+  <!-- ==================== CHECKOUT MODAL ==================== -->
+  <div class="checkout-modal" id="checkoutModal">
+    <div class="checkout-header">
+      <button class="checkout-back-btn" onclick="closeCheckout()">←</button>
+      <h2>Shipping &amp; Review</h2>
+    </div>
+    <div class="checkout-body">
+      <div class="checkout-section">
+        <h3>📦 Shipping Address</h3>
+        <div class="form-group">
+          <label class="form-label">Full Name <span class="required">*</span></label>
+          <input class="form-input" id="inputName" placeholder="John Smith" autocomplete="name">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone Number <span class="required">*</span></label>
+          <input class="form-input" id="inputPhone" type="tel" placeholder="(123) 456-7890" autocomplete="tel">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Street Address <span class="required">*</span></label>
+          <input class="form-input" id="inputAddress" placeholder="123 Main Street" autocomplete="street-address">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Apt / Suite / Unit</label>
+          <input class="form-input" id="inputApt" placeholder="Apt 4B (optional)" autocomplete="address-line2">
+        </div>
+        <div class="form-row-3">
+          <div class="form-group">
+            <label class="form-label">City <span class="required">*</span></label>
+            <input class="form-input" id="inputCity" placeholder="Los Angeles" autocomplete="locality">
+          </div>
+          <div class="form-group">
+            <label class="form-label">State <span class="required">*</span></label>
+            <select class="form-select" id="inputState" autocomplete="region"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">ZIP Code <span class="required">*</span></label>
+            <input class="form-input" id="inputZip" placeholder="90001" autocomplete="postal-code">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Country</label>
+            <input class="form-input" value="United States" readonly style="color:var(--text-light)">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Order Notes</label>
+          <input class="form-input" id="inputNotes" placeholder="Any special instructions...">
+        </div>
+      </div>
+      <div class="checkout-section">
+        <h3>📋 Order Review</h3>
+        <div class="checkout-items" id="checkoutItemsReview"></div>
+      </div>
+    </div>
+    <div class="checkout-submit">
+      <div class="checkout-total-row">
+        <span>Total</span>
+        <span id="checkoutTotal">$0.00</span>
+      </div>
+      <button class="submit-btn" id="submitBtn" onclick="submitOrder()">Place Order</button>
+    </div>
+  </div>
+
+  <!-- ==================== CONFIRMATION MODAL ==================== -->
+  <div class="confirm-modal" id="confirmModal">
+    <div class="checkout-header">
+      <span></span>
+      <h2>Order Confirmed</h2>
+      <button class="checkout-back-btn" onclick="closeConfirm()">✕</button>
+    </div>
+    <div class="confirm-body">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="confirm-title">Order Placed Successfully!</div>
+      <div class="confirm-order-id" id="confirmOrderId"></div>
+      <div class="confirm-summary" id="confirmSummary"></div>
+      <div class="confirm-actions">
+        <button class="confirm-btn confirm-btn-success" onclick="shareWhatsApp()">💬 Share via WhatsApp</button>
+        <button class="confirm-btn confirm-btn-primary" onclick="copyOrderText()">📋 Copy Order Text</button>
+        <button class="confirm-btn confirm-btn-secondary" onclick="newOrder()">Start New Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST ==================== -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ==================== SCRIPT ==================== -->
+  <script>
+    // ============================================================
+    // 📦 产品数据 — 在这里修改你的产品！
+    // ============================================================
+    //
+    // 🖼️ 【图片怎么放？超简单】
+    //   1. 把你的产品图片放到 order-page 文件夹里
+    //      （和 index.html 放在一起）
+    //   2. image 写 './图片文件名.svg' 就行！
+    //      比如你的图片叫 "cb1.svg"，就写 image: './cb1.svg'
+    //
+    // ⚠️ 重要：图片不能删！因为部署后图片和网页是一起的
+    //
+    // 每个产品的字段说明：
+    //   id       — 唯一编号（随意写，不要重复）
+    //   name     — 产品名称（直接改这里的文字）
+    //   price    — 单价 / 美元（改数字）
+    //   image    — './你的图片文件名.svg'  ← 只改这里
+    //   category — 分类名（必须和下面的分类一致）
+    //   variants — 规格选项 [{ name: '选项名', options: ['选项1','选项2'] }]
+    //
+    // 颜色缩写：YG=Yellow Gold, WG=White Gold, RG=Rose Gold
+    // ============================================================
+
+    const PRODUCTS = [
+
+      // =====================================================
+      // 📿 CLOVER BRACELET (5 products)
+      // =====================================================
+      // 产品1 & 2 & 5: Stone(11种,含All Diamonds) + Color + QTY 1-8
+      // 产品3:         Stone(10种,不含All Diamonds) + Color + QTY 1-8
+      // 产品4:         Style(2种) + QTY 1-5（注意QTY不同！用 qtyOptions 覆盖）
+      // =====================================================
+
+      // --- 1. Classic Clover Bracelet (5 motifs) ---
+      {
+        id: 'cb1',
+        name: 'Classic Clover Bracelet (5 Motifs)',
+        price: 28.50,
+        image: './cb1.jpg',
+        category: 'Clover Bracelet',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] }
+        ]
+      },
+
+      // --- 2. Mini Clover Bracelet (6 motifs) ---
+      {
+        id: 'cb2',
+        name: 'Mini Clover Bracelet (6 Motifs)',
+        price: 28.50,
+        image: './cb2.jpg',
+        category: 'Clover Bracelet',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] }
+        ]
+      },
+
+      // --- 3. Stone with Sparkles Bracelet (5 motifs) — 注意：没有 All Diamonds ---
+      {
+        id: 'cb3',
+        name: 'Stone with Sparkles Bracelet (5 Motifs)',
+        price: 28.50,
+        image: './cb3.svg',
+        category: 'Clover Bracelet',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] }
+        ]
+      },
+
+      // --- 4. 5 Charms Bracelet — 没有 Stone/Color，只有 Style；QTY 只有 1-5 ---
+      {
+        id: 'cb4',
+        name: '5 Charms Bracelet',
+        price: 41.80,
+        image: './cb4.jpg',
+        category: 'Clover Bracelet',
+        variants: [
+          { name: 'Style', options: ['Ladybug with 5 Charms (Rose Gold)', 'Butterfly with 5 Charms (Yellow Gold)'] }
+        ],
+        qtyOptions: [1, 2, 3, 4, 5]
+      },
+
+      // --- 5. One Motif Bracelet ---
+      {
+        id: 'cb5',
+        name: 'One Motif Bracelet',
+        price: 28.50,
+        image: './cb5.svg',
+        category: 'Clover Bracelet',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] }
+        ]
+      },
+
+      // =====================================================
+      // 📿 CLOVER NECKLACE
+      // =====================================================
+      {
+        id: 'cn1',
+        name: 'One Motif Clover Necklace',
+        price: 28.50,
+        image: './cn1.jpg',
+        category: 'Clover Necklace',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] }
+        ]
+      },
+      {
+        id: 'cn2',
+        name: '10 Motifs Clover Necklace',
+        price: 41.80,
+        image: './cn2.jpg',
+        category: 'Clover Necklace',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] }
+        ]
+      },
+
+      // =====================================================
+      // 📿 NAIL BANGLE — 选项：Color + Width + Size
+      // =====================================================
+      {
+        id: 'nb1',
+        name: 'Nail Bangle (Without Sparkle)',
+        price: 41.80,
+        image: './nb1.jpg',
+        category: 'Nail Bangle',
+        variants: [
+          { name: 'Color', options: ['YG', 'WG', 'RG'] },
+          { name: 'Width', options: ['Slim', 'Thick'] },
+          { name: 'Size', options: ['16', '17', '18', '19'] }
+        ]
+      },
+      {
+        id: 'nb2',
+        name: 'Nail Bangle (With Sparkles on Nail & Head)',
+        price: 41.80,
+        image: './nb2.jpg',
+        category: 'Nail Bangle',
+        variants: [
+          { name: 'Color', options: ['YG', 'WG', 'RG'] },
+          { name: 'Width', options: ['Slim', 'Thick'] },
+          { name: 'Size', options: ['16', '17', '18', '19'] }
+        ]
+      },
+
+      // =====================================================
+      // 📿 LOVE BANGLE — 选项：Color + Width + Size
+      // =====================================================
+      {
+        id: 'lb1',
+        name: 'Love Bangle (Without Sparkle)',
+        price: 28.50,
+        image: './lb1.jpg',
+        category: 'Love Bangle',
+        variants: [
+          { name: 'Color', options: ['YG', 'WG', 'RG'] },
+          { name: 'Width', options: ['Slim', 'Thick'] },
+          { name: 'Size', options: ['16', '17', '18', '19'] }
+        ]
+      },
+      {
+        id: 'lb2',
+        name: 'Love Bangle (With 4 Sparkles)',
+        price: 28.50,
+        image: './lb2.svg',                     // ← 🖼️ 替换为你的图片
+        category: 'Love Bangle',
+        variants: [
+          { name: 'Color', options: ['YG', 'WG', 'RG'] },
+          { name: 'Width', options: ['Slim', 'Thick'] },
+          { name: 'Size', options: ['16', '17', '18', '19'] }
+        ]
+      },
+      {
+        id: 'lb3',
+        name: 'Love Bangle (With 6 Sparkles)',
+        price: 28.50,
+        image: './lb3.svg',                     // ← 🖼️ 替换为你的图片
+        category: 'Love Bangle',
+        variants: [
+          { name: 'Color', options: ['YG', 'WG', 'RG'] },
+          { name: 'Width', options: ['Slim', 'Thick'] },
+          { name: 'Size', options: ['16', '17', '18', '19'] }
+        ]
+      },
+
+      // =====================================================
+      // 📿 CLOVER EARRING (1 product)
+      // Stone: 11种（和 Classic Clover Bracelet 一样）
+      // =====================================================
+      {
+        id: 'ce1',
+        name: 'One Motif Earring',
+        price: 28.50,
+        image: './ce1.jpg',
+        category: 'Clover Earring',
+        variants: [
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
+          { name: 'Color', options: ['YG', 'WG', 'RG'] },
+          { name: 'Type', options: ['Clip', 'Stud'] }
+        ]
+      }
+
+    ];
+
+    // 🔧 全局默认 QTY 选项 — 单个产品可以用 qtyOptions 覆盖
+    //    比如产品 4 (5 Charms Bracelet) 的 QTY 只有 1-5
+    const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    // 🔧 美国州列表
+    const US_STATES = [
+      'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA',
+      'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA',
+      'MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY',
+      'NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX',
+      'UT','VT','VA','WA','WV','WI','WY'
+    ];
+
+    // ============================================================
+    // STATE
+    // ============================================================
+    let cart = [];
+    let selectedVariants = {};   // key: `${productId}-${variantName}`, value: selected option
+    let selectedQtys = {};       // key: productId, value: number (1-8)
+
+    function loadCart() {
+      try { const s = localStorage.getItem('jewelry_cart_v2'); if (s) cart = JSON.parse(s); } catch(e) { cart = []; }
+    }
+    function saveCart() { localStorage.setItem('jewelry_cart_v2', JSON.stringify(cart)); }
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    function getCategories() {
+      const cats = [...new Set(PRODUCTS.map(p => p.category))];
+      return ['All', ...cats];
+    }
+    let activeCategory = 'All';
+
+    function renderCategoryTabs() {
+      document.getElementById('categoryTabs').innerHTML = getCategories().map(c =>
+        `<button class="category-tab${c === activeCategory ? ' active' : ''}" onclick="filterCategory('${c}')">${c}</button>`
+      ).join('');
+    }
+
+    function filterCategory(cat) { activeCategory = cat; renderCategoryTabs(); renderProducts(); }
+
+    function renderProducts() {
+      const filtered = activeCategory === 'All' ? PRODUCTS : PRODUCTS.filter(p => p.category === activeCategory);
+
+      document.getElementById('productGrid').innerHTML = filtered.map(p => {
+        // 变体选项按钮
+        const variantsHTML = p.variants.map(v => `
+          <div class="variant-group">
+            <div class="variant-label">${v.name}</div>
+            <div class="variant-options">
+              ${v.options.map(opt => {
+                const key = `${p.id}-${v.name}`;
+                const sel = selectedVariants[key] === opt;
+                const isColor = v.name === 'Color';
+                return `<button class="variant-option${isColor ? ' color-option' : ''}${sel ? ' selected' : ''}" onclick="selectVariant('${p.id}', '${v.name}', '${opt}', this)">${opt}</button>`;
+              }).join('')}
+            </div>
+          </div>
+        `).join('');
+
+        // 数量按钮 — 如果产品有 qtyOptions 就用产品的，否则用全局默认
+        const qtyOpts = p.qtyOptions || QTY_OPTIONS;
+        const currentQty = selectedQtys[p.id] || qtyOpts[0];
+        const qtyHTML = `
+          <div class="qty-group">
+            <div class="variant-label">QTY</div>
+            <div class="qty-options">
+              ${qtyOpts.map(n => `<button class="qty-option${currentQty === n ? ' selected' : ''}" onclick="selectQty('${p.id}', ${n}, this)">${n}</button>`).join('')}
+            </div>
+          </div>
+        `;
+
+        return `
+          <div class="product-card">
+            <div class="product-image-wrap">
+              <img src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="product-image-placeholder" style="display:none">🖼️<br>Replace Image</div>
+            </div>
+            <div class="product-info">
+              <div class="product-name">${p.name}</div>
+              <div class="product-price">$${p.price.toFixed(2)}<span class="unit"> / pc</span></div>
+              ${variantsHTML}
+              ${qtyHTML}
+              <button class="add-to-cart-btn" id="addBtn-${p.id}" onclick="addToCart('${p.id}', this)">
+                + Add to Cart
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ============================================================
+    // SELECTION HANDLERS
+    // ============================================================
+    function selectVariant(productId, variantName, option, btn) {
+      const key = `${productId}-${variantName}`;
+      if (selectedVariants[key] === option) {
+        delete selectedVariants[key];
+        btn.classList.remove('selected');
+      } else {
+        selectedVariants[key] = option;
+        const parent = btn.parentElement;
+        parent.querySelectorAll('.variant-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      }
+    }
+
+    function selectQty(productId, qty, btn) {
+      selectedQtys[productId] = qty;
+      const parent = btn.parentElement;
+      parent.querySelectorAll('.qty-option').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    }
+
+    function getSelectedVariants(productId) {
+      const product = PRODUCTS.find(p => p.id === productId);
+      const result = {};
+      let allSelected = true;
+      product.variants.forEach(v => {
+        const key = `${productId}-${v.name}`;
+        if (selectedVariants[key]) {
+          result[v.name] = selectedVariants[key];
+        } else {
+          allSelected = false;
+        }
+      });
+      return { variants: result, allSelected };
+    }
+
+    // ============================================================
+    // CART OPERATIONS
+    // ============================================================
+    function addToCart(productId, btn) {
+      const product = PRODUCTS.find(p => p.id === productId);
+      const { variants, allSelected } = getSelectedVariants(productId);
+      if (!allSelected) {
+        showToast('⚠️ Please select all options first');
+        return;
+      }
+
+      const quantity = selectedQtys[productId] || 1;
+
+      // 检查购物车里是否已有同产品+同规格
+      const existingIdx = cart.findIndex(item =>
+        item.productId === productId &&
+        JSON.stringify(item.variants) === JSON.stringify(variants)
+      );
+
+      if (existingIdx >= 0) {
+        cart[existingIdx].quantity += quantity;
+      } else {
+        cart.push({
+          cartItemId: Date.now(),
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          image: product.image,
+          variants: variants,
+          quantity: quantity
+        });
+      }
+
+      saveCart();
+      updateCartUI();
+
+      // 按钮动画
+      btn.textContent = '✓ Added!';
+      btn.classList.add('added');
+      setTimeout(() => { btn.textContent = '+ Add to Cart'; btn.classList.remove('added'); }, 1200);
+
+      showToast(`Added: ${product.name} ×${quantity}`);
+    }
+
+    function updateCartItemQty(cartItemId, delta) {
+      const item = cart.find(i => i.cartItemId === cartItemId);
+      if (!item) return;
+      item.quantity += delta;
+      if (item.quantity <= 0) cart = cart.filter(i => i.cartItemId !== cartItemId);
+      saveCart(); updateCartUI();
+    }
+
+    function updateCartItemQtyDirect(cartItemId, val) {
+      const v = parseInt(val);
+      if (isNaN(v) || v < 1) { updateCartUI(); return; }
+      const item = cart.find(i => i.cartItemId === cartItemId);
+      if (item) { item.quantity = Math.min(999, v); saveCart(); }
+      updateCartUI();
+    }
+
+    function removeCartItem(cartItemId) {
+      cart = cart.filter(i => i.cartItemId !== cartItemId);
+      saveCart(); updateCartUI();
+    }
+
+    function clearCart() {
+      if (cart.length === 0) return;
+      if (confirm('Remove all items from cart?')) { cart = []; saveCart(); updateCartUI(); }
+    }
+
+    function getCartTotal() { return cart.reduce((s, i) => s + i.price * i.quantity, 0); }
+    function getCartCount() { return cart.reduce((s, i) => s + i.quantity, 0); }
+
+    // ============================================================
+    // CART UI
+    // ============================================================
+    function updateCartUI() {
+      const count = getCartCount();
+      const total = getCartTotal();
+
+      const badge = document.getElementById('cartBadge');
+      badge.textContent = count || '';
+      if (count > 0) { badge.classList.add('bump'); setTimeout(() => badge.classList.remove('bump'), 300); }
+
+      document.getElementById('cartBarCount').textContent = count || '';
+      document.getElementById('cartBarItems').textContent = count === 1 ? '1 item' : `${count} items`;
+      document.getElementById('cartBarTotal').textContent = `$${total.toFixed(2)}`;
+      const barBtn = document.getElementById('cartBarBtn');
+      barBtn.disabled = count === 0;
+      barBtn.textContent = count > 0 ? 'View Cart' : 'Cart Empty';
+
+      renderCartPanel();
+    }
+
+    function renderCartPanel() {
+      const container = document.getElementById('cartItems');
+      const total = getCartTotal();
+      document.getElementById('cartSubtotal').textContent = `$${total.toFixed(2)}`;
+      document.getElementById('cartCheckoutBtn').disabled = cart.length === 0;
+
+      if (cart.length === 0) {
+        container.innerHTML = `<div class="cart-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><p>Your cart is empty</p></div>`;
+        return;
+      }
+
+      container.innerHTML = cart.map(item => {
+        const vt = Object.entries(item.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+        return `
+          <div class="cart-item">
+            <img class="cart-item-image" src="${item.image}" alt="${item.name}" onerror="this.style.display='none'">
+            <div class="cart-item-details">
+              <div class="cart-item-name">${item.name}</div>
+              <div class="cart-item-variants">${vt}</div>
+              <div class="cart-item-price">$${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)}</div>
+              <div class="cart-item-actions">
+                <div class="cart-item-qty">
+                  <button class="cart-qty-btn" onclick="updateCartItemQty(${item.cartItemId}, -1)">−</button>
+                  <input class="cart-qty-input" type="number" value="${item.quantity}" min="1" max="999" onchange="updateCartItemQtyDirect(${item.cartItemId}, this.value)">
+                  <button class="cart-qty-btn" onclick="updateCartItemQty(${item.cartItemId}, 1)">+</button>
+                </div>
+                <button class="cart-item-remove" onclick="removeCartItem(${item.cartItemId})">Remove</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ============================================================
+    // PANELS
+    // ============================================================
+    function openCart() {
+      document.getElementById('cartPanel').classList.add('show');
+      document.getElementById('overlay').classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeCart() {
+      document.getElementById('cartPanel').classList.remove('show');
+      document.getElementById('overlay').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+    function openCheckout() {
+      if (cart.length === 0) return;
+      closeCart(); renderCheckoutReview();
+      document.getElementById('checkoutModal').classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeCheckout() {
+      document.getElementById('checkoutModal').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+    function closeConfirm() {
+      document.getElementById('confirmModal').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+
+    // ============================================================
+    // CHECKOUT
+    // ============================================================
+    function renderCheckoutReview() {
+      const container = document.getElementById('checkoutItemsReview');
+      container.innerHTML = cart.map(item => {
+        const vt = Object.entries(item.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+        return `
+          <div class="checkout-item-row">
+            <span class="checkout-item-name">${item.name} <span style="color:var(--text-light);font-size:12px">(${vt})</span></span>
+            <span class="checkout-item-qty">×${item.quantity}</span>
+            <span class="checkout-item-subtotal">$${(item.price*item.quantity).toFixed(2)}</span>
+          </div>`;
+      }).join('');
+      document.getElementById('checkoutTotal').textContent = `$${getCartTotal().toFixed(2)}`;
+    }
+
+    function populateStates() {
+      const sel = document.getElementById('inputState');
+      sel.innerHTML = '<option value="">Select state...</option>' + US_STATES.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+
+    function validateForm() {
+      const fields = [
+        { id: 'inputName', label: 'Full Name' },
+        { id: 'inputPhone', label: 'Phone Number' },
+        { id: 'inputAddress', label: 'Street Address' },
+        { id: 'inputCity', label: 'City' },
+        { id: 'inputState', label: 'State' },
+        { id: 'inputZip', label: 'ZIP Code' },
+      ];
+      const missing = fields.filter(f => !document.getElementById(f.id).value.trim()).map(f => f.label);
+      if (missing.length) { showToast('⚠️ Please fill in: ' + missing.join(', ')); return false; }
+      return true;
+    }
+
+    function submitOrder() {
+      if (!validateForm()) return;
+      const btn = document.getElementById('submitBtn');
+      btn.textContent = 'Processing...'; btn.classList.add('loading');
+
+      setTimeout(() => {
+        const orderId = 'ORD-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+        const orderData = {
+          orderId,
+          date: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
+          customer: {
+            name: document.getElementById('inputName').value.trim(),
+            phone: document.getElementById('inputPhone').value.trim(),
+            address: document.getElementById('inputAddress').value.trim(),
+            apt: document.getElementById('inputApt').value.trim(),
+            city: document.getElementById('inputCity').value.trim(),
+            state: document.getElementById('inputState').value,
+            zip: document.getElementById('inputZip').value.trim(),
+          },
+          items: cart.map(i => ({
+            name: i.name, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity
+          })),
+          total: getCartTotal(),
+          notes: document.getElementById('inputNotes').value.trim()
+        };
+        showConfirmation(orderData);
+        btn.textContent = 'Place Order'; btn.classList.remove('loading');
+      }, 600);
+    }
+
+    function showConfirmation(data) {
+      document.getElementById('checkoutModal').classList.remove('show');
+      document.getElementById('confirmModal').classList.add('show');
+      document.getElementById('confirmOrderId').textContent = `Order #${data.orderId} · ${data.date} (ET)`;
+
+      const addr = [data.customer.address, data.customer.apt, `${data.customer.city}, ${data.customer.state} ${data.customer.zip}`].filter(Boolean).join(', ');
+      const itemsText = data.items.map((it, i) => {
+        const vt = Object.entries(it.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+        return `${i+1}. ${it.name} (${vt}) × ${it.quantity} = $${it.subtotal.toFixed(2)}`;
+      }).join('<br>');
+
+      document.getElementById('confirmSummary').innerHTML = `
+        <strong>Order #${data.orderId}</strong><br>
+        <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
+        <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>
+        ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
+        <strong>🛒 Items:</strong><br>${itemsText}<br><br>
+        <strong>💰 Total: $${data.total.toFixed(2)}</strong>`;
+
+      window._lastOrder = data;
+      window._lastOrderText = [
+        `📋 *Order #${data.orderId}*`,
+        `📅 ${data.date} (ET)`,
+        ``,
+        `📦 *Ship To:*`,
+        data.customer.name,
+        addr,
+        `📞 ${data.customer.phone}`,
+        data.notes ? `📝 Notes: ${data.notes}` : '',
+        ``,
+        `🛒 *Items:*`,
+        ...data.items.map((it, i) => {
+          const vt = Object.entries(it.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+          return `${i+1}. ${it.name} (${vt}) × ${it.quantity} = $${it.subtotal.toFixed(2)}`;
+        }),
+        ``,
+        `💰 *Total: $${data.total.toFixed(2)}*`
+      ].filter(Boolean).join('\n');
+    }
+
+    function shareWhatsApp() {
+      if (!window._lastOrderText) return;
+      window.open('https://wa.me/?text=' + encodeURIComponent(window._lastOrderText), '_blank');
+    }
+    function copyOrderText() {
+      if (!window._lastOrderText) return;
+      navigator.clipboard.writeText(window._lastOrderText).then(() => showToast('✅ Copied! Paste in WhatsApp')).catch(() => showToast('⚠️ Copy failed'));
+    }
+    function newOrder() {
+      cart = []; saveCart(); updateCartUI(); closeConfirm();
+      ['inputName','inputPhone','inputAddress','inputApt','inputCity','inputState','inputZip','inputNotes'].forEach(id => document.getElementById(id).value = '');
+      showToast('🆕 Ready for new order!');
+    }
+
+    // ============================================================
+    // TOAST
+    // ============================================================
+    let toastTimer;
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    // ============================================================
+    // INIT
+    // ============================================================
+    function init() {
+      populateStates(); loadCart(); renderCategoryTabs(); renderProducts(); updateCartUI();
+    }
+    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeConfirm(); closeCheckout(); closeCart(); } });
+  </script>
+</body>
+</html>
