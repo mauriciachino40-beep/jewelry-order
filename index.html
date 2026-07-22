@@ -453,6 +453,10 @@
           <input class="form-input" id="inputPhone" type="tel" placeholder="(123) 456-7890" autocomplete="tel">
         </div>
         <div class="form-group">
+          <label class="form-label">Email <span class="required">*</span></label>
+          <input class="form-input" id="inputEmail" type="email" placeholder="customer@gmail.com" autocomplete="email">
+        </div>
+        <div class="form-group">
           <label class="form-label">Street Address <span class="required">*</span></label>
           <input class="form-input" id="inputAddress" placeholder="123 Main Street" autocomplete="street-address">
         </div>
@@ -1073,6 +1077,7 @@
     function validateForm() {
       const fields = [
         { id: 'inputName', label: 'Full Name' },
+        { id: 'inputEmail', label: 'Email' },
         { id: 'inputPhone', label: 'Phone Number' },
         { id: 'inputAddress', label: 'Street Address' },
         { id: 'inputCity', label: 'City' },
@@ -1081,6 +1086,8 @@
       ];
       const missing = fields.filter(f => !document.getElementById(f.id).value.trim()).map(f => f.label);
       if (missing.length) { showToast('⚠️ Please fill in: ' + missing.join(', ')); return false; }
+      const email = document.getElementById('inputEmail').value.trim();
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('⚠️ Please enter a valid email'); return false; }
       return true;
     }
 
@@ -1095,6 +1102,7 @@
         date: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
         customer: {
           name: document.getElementById('inputName').value.trim(),
+          email: document.getElementById('inputEmail').value.trim(),
           phone: document.getElementById('inputPhone').value.trim(),
           address: document.getElementById('inputAddress').value.trim(),
           apt: document.getElementById('inputApt').value.trim(),
@@ -1138,7 +1146,7 @@
       document.getElementById('confirmSummary').innerHTML = `
         <strong>Order #${data.orderId}</strong><br>
         <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
-        <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>
+        <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>📧 ${data.customer.email}<br>
         ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
         <strong>🛒 Items:</strong><br>${itemsText}<br><br>
         <strong>💰 Total: $${data.total.toFixed(2)}</strong>`;
@@ -1152,6 +1160,7 @@
         data.customer.name,
         addr,
         `📞 ${data.customer.phone}`,
+        `📧 ${data.customer.email}`,
         data.notes ? `📝 Notes: ${data.notes}` : '',
         ``,
         `🛒 *Items:*`,
@@ -1174,7 +1183,7 @@
     }
     function newOrder() {
       cart = []; saveCart(); updateCartUI(); closeConfirm();
-      ['inputName','inputPhone','inputAddress','inputApt','inputCity','inputState','inputZip','inputNotes'].forEach(id => document.getElementById(id).value = '');
+      ['inputName','inputEmail','inputPhone','inputAddress','inputApt','inputCity','inputState','inputZip','inputNotes'].forEach(id => document.getElementById(id).value = '');
       showToast('🆕 Ready for new order!');
     }
 
