@@ -697,27 +697,26 @@
       },
       {
         id: 'lb2',
-        name: 'Love Bangle (With 4 Sparkles)',
+        name: 'Love Bangle (With Sparkles)',
         price: 28.50,
         image: './lb2.svg',                     // ← 🖼️ 替换为你的图片
         category: 'Love Bangle',
         variants: [
+          { name: 'Sparkles', options: ['4 Diamonds', '6 Diamonds', '8 Diamonds', '10 Diamonds', 'Pave (Full Diamonds)'] },
           { name: 'Color', options: ['YG', 'WG', 'RG'] },
           { name: 'Width', options: ['Slim', 'Thick'] },
           { name: 'Size', options: ['16', '17', '18', '19'] }
-        ]
-      },
-      {
-        id: 'lb3',
-        name: 'Love Bangle (With 6 Sparkles)',
-        price: 28.50,
-        image: './lb3.svg',                     // ← 🖼️ 替换为你的图片
-        category: 'Love Bangle',
-        variants: [
-          { name: 'Color', options: ['YG', 'WG', 'RG'] },
-          { name: 'Width', options: ['Slim', 'Thick'] },
-          { name: 'Size', options: ['16', '17', '18', '19'] }
-        ]
+        ],
+        priceByVariant: {
+          name: 'Sparkles',
+          pricing: {
+            '4 Diamonds': 28.50,
+            '6 Diamonds': 28.50,
+            '8 Diamonds': 28.50,
+            '10 Diamonds': 28.50,
+            'Pave (Full Diamonds)': 41.80
+          }
+        }
       },
 
       // =====================================================
@@ -742,6 +741,27 @@
     // 🔧 全局默认 QTY 选项 — 单个产品可以用 qtyOptions 覆盖
     //    比如产品 4 (5 Charms Bracelet) 的 QTY 只有 1-5
     const QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    // 🔧 根据变体选择获取实际价格（支持不同选项不同价格）
+    function getEffectivePrice(productId) {
+      const product = PRODUCTS.find(p => p.id === productId);
+      if (!product.priceByVariant) return product.price;
+      const variantName = product.priceByVariant.name;
+      const key = `${productId}-${variantName}`;
+      const selected = selectedVariants[key];
+      if (selected && product.priceByVariant.pricing[selected] !== undefined) {
+        return product.priceByVariant.pricing[selected];
+      }
+      return product.price;
+    }
+
+    function updateProductPrice(productId) {
+      const el = document.getElementById(`price-${productId}`);
+      if (el) {
+        const price = getEffectivePrice(productId);
+        el.innerHTML = `$${price.toFixed(2)}<span class="unit"> / pc</span>`;
+      }
+    }
 
     // 🔧 美国州列表
     const US_STATES = [
@@ -820,7 +840,7 @@
             </div>
             <div class="product-info">
               <div class="product-name">${p.name}</div>
-              <div class="product-price">$${p.price.toFixed(2)}<span class="unit"> / pc</span></div>
+              <div class="product-price" id="price-${p.id}">$${getEffectivePrice(p.id).toFixed(2)}<span class="unit"> / pc</span></div>
               ${variantsHTML}
               ${qtyHTML}
               <button class="add-to-cart-btn" id="addBtn-${p.id}" onclick="addToCart('${p.id}', this)">
@@ -846,6 +866,7 @@
         parent.querySelectorAll('.variant-option').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
       }
+      updateProductPrice(productId);
     }
 
     function selectQty(productId, qty, btn) {
@@ -882,6 +903,7 @@
       }
 
       const quantity = selectedQtys[productId] || 1;
+      const effectivePrice = getEffectivePrice(productId);
 
       // 检查购物车里是否已有同产品+同规格
       const existingIdx = cart.findIndex(item =>
@@ -896,7 +918,7 @@
           cartItemId: Date.now(),
           productId: product.id,
           name: product.name,
-          price: product.price,
+          price: effectivePrice,
           image: product.image,
           variants: variants,
           quantity: quantity
