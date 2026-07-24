@@ -1076,7 +1076,15 @@
       }
 
       container.innerHTML = cart.map(item => {
-        const vt = Object.entries(item.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+        const order = ['Width', 'Color', 'Size'];
+        const keys = Object.keys(item.variants).sort((a, b) => {
+          const ai = order.indexOf(a), bi = order.indexOf(b);
+          if (ai === -1 && bi === -1) return 0;
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return ai - bi;
+        });
+        const vt = keys.map(k => item.variants[k]).join(', ');
         return `
           <div class="cart-item">
             <img class="cart-item-image" src="${item.image}" alt="${item.name}" onerror="this.style.display='none'">
