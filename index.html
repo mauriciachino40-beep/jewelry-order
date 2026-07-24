@@ -1081,12 +1081,24 @@
     function renderCheckoutReview() {
       const container = document.getElementById('checkoutItemsReview');
       container.innerHTML = cart.map(item => {
-        const vt = Object.entries(item.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+        // 选项顺序：Color → Stone → Size → 其他
+        const order = ['Color', 'Stone', 'Size'];
+        const keys = Object.keys(item.variants).sort((a, b) => {
+          const ai = order.indexOf(a), bi = order.indexOf(b);
+          if (ai === -1 && bi === -1) return 0;
+          if (ai === -1) return 1;
+          if (bi === -1) return -1;
+          return ai - bi;
+        });
+        const vt = keys.map(k => item.variants[k]).join(', ');
         return `
-          <div class="checkout-item-row">
-            <span class="checkout-item-name">${item.name} <span style="color:var(--text-light);font-size:12px">(${vt})</span></span>
-            <span class="checkout-item-qty">×${item.quantity}</span>
-            <span class="checkout-item-subtotal">$${(item.price*item.quantity).toFixed(2)}</span>
+          <div class="checkout-item-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <img src="${item.image}" alt="${item.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:13px;">${item.name}</div>
+              <div style="color:var(--text-light);font-size:11px;">${vt}</div>
+              <div style="font-size:12px;">$${item.price.toFixed(2)} × ${item.quantity} = <strong>$${(item.price*item.quantity).toFixed(2)}</strong></div>
+            </div>
           </div>`;
       }).join('');
       document.getElementById('checkoutTotal').textContent = `$${getCartTotal().toFixed(2)}`;
@@ -1153,9 +1165,17 @@
 
       const addr = [data.customer.address, data.customer.apt, `${data.customer.city}, ${data.customer.state} ${data.customer.zip}`].filter(Boolean).join(', ');
 
-      // 简化变体显示：不显示分类名，只显示选中的选项值
+      // 简化变体显示：不显示分类名，只显示选中的选项值（排序：Color → Stone → Size → 其他）
+      const variantOrder = ['Color', 'Stone', 'Size'];
+      const sortKeys = keys => keys.sort((a, b) => {
+        const ai = variantOrder.indexOf(a), bi = variantOrder.indexOf(b);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
       const itemsRows = data.items.map((it, i) => {
-        const vt = Object.values(it.variants).join(', ');
+        const vt = sortKeys(Object.keys(it.variants)).map(k => it.variants[k]).join(', ');
         return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
       });
 
