@@ -871,6 +871,12 @@
       if (migrated) saveCart();
     }
     function saveCart() { localStorage.setItem('jewelry_cart_v2', JSON.stringify(cart)); }
+    function formatVariant(v) {
+      const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
+      if (COLOR_MAP[v]) return COLOR_MAP[v];
+      if (/^\d+$/.test(v)) return v + 'cm';
+      return v;
+    }
 
     // ============================================================
     // RENDER
@@ -1094,7 +1100,7 @@
           if (bi === -1) return -1;
           return ai - bi;
         });
-        const vt = keys.map(k => item.variants[k]).join(', ');
+        const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
         return `
           <div class="cart-item">
             <img class="cart-item-image" src="${item.image}" alt="${item.name}" onerror="this.style.display='none'">
@@ -1158,7 +1164,7 @@
           if (bi === -1) return -1;
           return ai - bi;
         });
-        const vt = keys.map(k => item.variants[k]).join(', ');
+        const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
         return `
           <div class="checkout-item-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
             <img src="${item.image}" alt="${item.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
@@ -1246,7 +1252,7 @@
         return ai - bi;
       });
       const itemsRows = data.items.map((it, i) => {
-        const vt = sortKeys(Object.keys(it.variants)).map(k => it.variants[k]).join(', ');
+        const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k])).join(', ');
         return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
       });
 
@@ -1389,7 +1395,7 @@
         return ai - bi;
       });
       const itemsRows = data.items.map((it, i) => {
-        const vt = sortKeys(Object.keys(it.variants)).map(k => it.variants[k]).join(', ');
+        const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k])).join(', ');
         return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
       });
       const itemsListHTML = itemsRows.map(r => `
