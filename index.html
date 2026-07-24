@@ -366,21 +366,23 @@
 
     /* ========== Print Styles ========== */
     @media print {
+      @page { margin: 10mm; size: auto; }
       body, html { background: #fff !important; padding: 0; margin: 0; }
-      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .confirm-icon, .checkout-header, .confirm-order-id { display: none !important; }
-      .confirm-modal { position: static; max-width: 100%; border: none; box-shadow: none; height: auto; }
-      .confirm-body { padding: 20px; text-align: left; }
-      .confirm-summary { font-size: 13px; line-height: 1.6; }
-      .confirm-summary table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-      .confirm-summary th { background: #f5f5f5; text-align: left; padding: 6px 8px; font-size: 12px; border-bottom: 2px solid #333; }
-      .confirm-summary td { padding: 6px 8px; font-size: 12px; border-bottom: 1px solid #ddd; }
+      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .confirm-icon, .checkout-header, .confirm-order-id,
+      .confirm-summary > strong, .confirm-summary > span, .confirm-summary br + strong, .confirm-item-row, .confirm-summary br { display: none !important; }
+      .confirm-modal { display: block !important; position: static !important; max-width: 100% !important; border: none !important; box-shadow: none !important; height: auto !important; transform: none !important; width: 100% !important; }
+      .confirm-body { padding: 0 !important; text-align: left; max-height: none; overflow: visible; }
+      .confirm-summary { font-size: 12px; line-height: 1.5; }
+      .confirm-summary table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+      .confirm-summary th { background: #f0f0f0; text-align: left; padding: 5px 6px; font-size: 11px; border-bottom: 2px solid #333; }
+      .confirm-summary td { padding: 5px 6px; font-size: 11px; border-bottom: 1px solid #ddd; }
       .confirm-summary .text-right { text-align: right; }
-      .print-title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 4px; letter-spacing: 1px; text-transform: uppercase; }
-      .print-order-id { font-size: 13px; text-align: center; color: #666; margin-bottom: 16px; }
-      .print-section { margin-bottom: 14px; }
-      .print-section h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
-      .print-section p { font-size: 12px; margin: 0; line-height: 1.5; }
-      .print-total { font-size: 16px; font-weight: 700; text-align: right; margin-top: 10px; border-top: 2px solid #333; padding-top: 6px; }
+      .print-title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 2px; letter-spacing: 1px; text-transform: uppercase; }
+      .print-order-id { font-size: 12px; text-align: center; color: #666; margin-bottom: 14px; }
+      .print-section { margin-bottom: 12px; }
+      .print-section h4 { font-size: 12px; font-weight: 700; margin-bottom: 3px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
+      .print-section p { font-size: 11px; margin: 0; line-height: 1.4; }
+      .print-total { font-size: 15px; font-weight: 700; text-align: right; margin-top: 8px; border-top: 2px solid #333; padding-top: 4px; }
     }
 
     /* ========== Toast ========== */
@@ -469,16 +471,16 @@
           <input class="form-input" id="inputName" placeholder="John Smith" autocomplete="name">
         </div>
         <div class="form-group">
-          <label class="form-label">Phone Number <span class="required">*</span></label>
-          <input class="form-input" id="inputPhone" type="tel" placeholder="(123) 456-7890" autocomplete="tel">
+          <label class="form-label">Phone Number</label>
+          <input class="form-input" id="inputPhone" type="tel" placeholder="(123) 456-7890 (optional)" autocomplete="tel">
         </div>
         <div class="form-group">
-          <label class="form-label">Email <span class="required">*</span></label>
-          <input class="form-input" id="inputEmail" type="email" placeholder="customer@gmail.com" autocomplete="email">
+          <label class="form-label">Email</label>
+          <input class="form-input" id="inputEmail" type="email" placeholder="customer@gmail.com (optional)" autocomplete="email">
         </div>
         <div class="form-group">
-          <label class="form-label">Street Address <span class="required">*</span></label>
-          <input class="form-input" id="inputAddress" placeholder="123 Main Street" autocomplete="street-address">
+          <label class="form-label">Street Address</label>
+          <input class="form-input" id="inputAddress" placeholder="123 Main Street (optional)" autocomplete="street-address">
         </div>
         <div class="form-group">
           <label class="form-label">Apt / Suite / Unit</label>
@@ -486,18 +488,18 @@
         </div>
         <div class="form-row-3">
           <div class="form-group">
-            <label class="form-label">City <span class="required">*</span></label>
-            <input class="form-input" id="inputCity" placeholder="Los Angeles" autocomplete="locality">
+            <label class="form-label">City</label>
+            <input class="form-input" id="inputCity" placeholder="Los Angeles (optional)" autocomplete="locality">
           </div>
           <div class="form-group">
-            <label class="form-label">State <span class="required">*</span></label>
+            <label class="form-label">State</label>
             <select class="form-select" id="inputState" autocomplete="region"></select>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">ZIP Code <span class="required">*</span></label>
-            <input class="form-input" id="inputZip" placeholder="90001" autocomplete="postal-code">
+            <label class="form-label">ZIP Code</label>
+            <input class="form-input" id="inputZip" placeholder="90001 (optional)" autocomplete="postal-code">
           </div>
           <div class="form-group">
             <label class="form-label">Country</label>
@@ -1096,17 +1098,8 @@
     }
 
     function validateForm() {
-      const fields = [
-        { id: 'inputName', label: 'Full Name' },
-        { id: 'inputEmail', label: 'Email' },
-        { id: 'inputPhone', label: 'Phone Number' },
-        { id: 'inputAddress', label: 'Street Address' },
-        { id: 'inputCity', label: 'City' },
-        { id: 'inputState', label: 'State' },
-        { id: 'inputZip', label: 'ZIP Code' },
-      ];
-      const missing = fields.filter(f => !document.getElementById(f.id).value.trim()).map(f => f.label);
-      if (missing.length) { showToast('⚠️ Please fill in: ' + missing.join(', ')); return false; }
+      const name = document.getElementById('inputName').value.trim();
+      if (!name) { showToast('⚠️ Please enter your name'); return false; }
       const email = document.getElementById('inputEmail').value.trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('⚠️ Please enter a valid email'); return false; }
       return true;
@@ -1132,7 +1125,7 @@
           zip: document.getElementById('inputZip').value.trim(),
         },
         items: cart.map(i => ({
-          name: i.name, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity
+          name: i.name, image: i.image, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity
         })),
         total: getCartTotal(),
         notes: document.getElementById('inputNotes').value.trim()
@@ -1160,31 +1153,43 @@
 
       const addr = [data.customer.address, data.customer.apt, `${data.customer.city}, ${data.customer.state} ${data.customer.zip}`].filter(Boolean).join(', ');
 
-      // 屏幕显示 + 打印表格
+      // 简化变体显示：不显示分类名，只显示选中的选项值
       const itemsRows = data.items.map((it, i) => {
-        const vt = Object.entries(it.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
-        return { num: i+1, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
+        const vt = Object.values(it.variants).join(', ');
+        return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
       });
-      const itemsTableHTML = `
-        <table>
-          <thead><tr><th>#</th><th>Product</th><th>Options</th><th>Qty</th><th>Price</th><th class="text-right">Subtotal</th></tr></thead>
-          <tbody>${itemsRows.map(r => `<tr><td>${r.num}</td><td>${r.name}</td><td style="font-size:11px;color:#888">${r.variants}</td><td>×${r.qty}</td><td>$${r.price.toFixed(2)}</td><td class="text-right">$${r.subtotal.toFixed(2)}</td></tr>`).join('')}</tbody>
-        </table>`;
-      const itemsText = itemsRows.map(r => `${r.num}. ${r.name} (${r.variants}) × ${r.qty} = $${r.subtotal.toFixed(2)}`).join('<br>');
+
+      // 屏幕显示 — 带图片
+      const itemsListHTML = itemsRows.map(r => `
+        <div class="confirm-item-row" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+          <img src="${r.image}" alt="${r.name}" style="width:50px;height:50px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:14px;">${r.name}</div>
+            <div style="color:var(--text-light);font-size:12px;">${r.variants}</div>
+            <div style="font-size:13px;">$${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong></div>
+          </div>
+        </div>
+      `).join('');
 
       document.getElementById('confirmSummary').innerHTML = `
         <strong>Order #${data.orderId}</strong><br>
         <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
-        <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>📧 ${data.customer.email}<br>
+        <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr || '(no address provided)'}<br>${data.customer.phone ? '📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}<br>
         ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
-        ${itemsTableHTML}<br>
-        <strong>💰 Total: $${data.total.toFixed(2)}</strong>`;
+        <strong>🛒 Items:</strong><br>
+        ${itemsListHTML}<br>
+        <strong style="font-size:18px;">💰 Total: $${data.total.toFixed(2)}</strong>`;
 
-      // 打印版内容
+      // 打印版本 — 纯表格
+      const itemsTableHTML = `
+        <table>
+          <thead><tr><th>#</th><th>Product</th><th>Options</th><th>Qty</th><th>Price</th><th class="text-right">Subtotal</th></tr></thead>
+          <tbody>${itemsRows.map(r => `<tr><td>${r.num}</td><td>${r.name}</td><td style="font-size:11px;color:#555">${r.variants}</td><td>×${r.qty}</td><td>$${r.price.toFixed(2)}</td><td class="text-right">$${r.subtotal.toFixed(2)}</td></tr>`).join('')}</tbody>
+        </table>`;
       const printHTML = `
         <div class="print-title">Jewelry Wholesale Order</div>
         <div class="print-order-id">Order #${data.orderId} · ${data.date} (ET)</div>
-        <div class="print-section"><h4>📦 SHIP TO</h4><p>${data.customer.name}<br>${addr}<br>📞 ${data.customer.phone}<br>📧 ${data.customer.email}</p></div>
+        <div class="print-section"><h4>📦 SHIP TO</h4><p>${data.customer.name}<br>${addr || '(no address)'}${data.customer.phone ? '<br>📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}</p></div>
         ${data.notes ? `<div class="print-section"><h4>📝 NOTES</h4><p>${data.notes}</p></div>` : ''}
         <div class="print-section"><h4>🛒 ORDER ITEMS</h4>${itemsTableHTML}</div>
         <div class="print-total">TOTAL: $${data.total.toFixed(2)}</div>`;
@@ -1197,14 +1202,14 @@
         ``,
         `📦 *Ship To:*`,
         data.customer.name,
-        addr,
-        `📞 ${data.customer.phone}`,
-        `📧 ${data.customer.email}`,
+        addr || '(no address)',
+        data.customer.phone ? `📞 ${data.customer.phone}` : '',
+        data.customer.email ? `📧 ${data.customer.email}` : '',
         data.notes ? `📝 Notes: ${data.notes}` : '',
         ``,
         `🛒 *Items:*`,
         ...data.items.map((it, i) => {
-          const vt = Object.entries(it.variants).map(([k,v]) => `${k}: ${v}`).join(', ');
+          const vt = Object.values(it.variants).join(', ');
           return `${i+1}. ${it.name} (${vt}) × ${it.quantity} = $${it.subtotal.toFixed(2)}`;
         }),
         ``,
