@@ -859,6 +859,16 @@
 
     function loadCart() {
       try { const s = localStorage.getItem('jewelry_cart_v2'); if (s) cart = JSON.parse(s); } catch(e) { cart = []; }
+      // 迁移旧数据：YG/WG/RG → 全称，size 数字 → 数字+cm
+      const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
+      let migrated = false;
+      cart.forEach(item => {
+        for (const k in item.variants) {
+          if (COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
+          if (k === 'Size' && /^\d+$/.test(item.variants[k])) { item.variants[k] = item.variants[k] + 'cm'; migrated = true; }
+        }
+      });
+      if (migrated) saveCart();
     }
     function saveCart() { localStorage.setItem('jewelry_cart_v2', JSON.stringify(cart)); }
 
