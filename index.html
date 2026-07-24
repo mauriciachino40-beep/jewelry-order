@@ -535,7 +535,7 @@
     <div class="checkout-body">
       <div class="confirm-summary" id="orderDetailContent"></div>
     </div>
-    <div class="checkout-submit" style="display:flex;gap:8px;padding:12px 20px;">
+    <div class="checkout-submit" style="display:flex;gap:8px;padding:12px 20px;padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));">
       <button class="confirm-btn confirm-btn-print" style="flex:1" onclick="printOrderDetail()">🖨️ Print / Save PDF</button>
       <button class="confirm-btn confirm-btn-danger" style="flex:1" id="cancelOrderBtn" onclick="openCancelModal()">🗑️ Cancel Order</button>
     </div>
@@ -1391,6 +1391,7 @@
     }
     function closeOrders() {
       document.getElementById('ordersPanel').classList.remove('show');
+      document.getElementById('orderDetailModal').classList.remove('show');
       document.getElementById('overlay').classList.remove('show');
       document.body.style.overflow = '';
     }
@@ -1406,21 +1407,25 @@
         const itemSummary = o.items.map(i => i.name.split(' (')[0]).slice(0, 2).join(', ') + (o.items.length > 2 ? '...' : '');
         const cancelled = o.cancelled;
         return `
-          <div class="order-card${cancelled ? ' cancelled' : ''}" onclick="openOrderDetail(${idx})">
-            <div class="order-card-header">
-              <span class="order-card-id">${cancelled ? '🗑️' : '📋'} ${o.orderId}</span>
-              <span class="order-card-date">${o.date}</span>
+          <div class="order-card${cancelled ? ' cancelled' : ''}" onclick="openOrderDetail(${idx})" style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="flex:1;min-width:0;">
+              <div class="order-card-header">
+                <span class="order-card-id">${cancelled ? '🗑️' : '📋'} ${o.orderId}</span>
+                <span class="order-card-date">${o.date}</span>
+              </div>
+              <div class="order-card-info">${itemSummary} · ${itemCount} item${itemCount>1?'s':''}</div>
+              <div class="order-card-total">💰 $${o.total.toFixed(2)}</div>
+              ${cancelled ? `<div class="order-card-cancelled">🚫 Cancelled: ${o.cancelReason || 'N/A'}</div>` : ''}
             </div>
-            <div class="order-card-info">${itemSummary} · ${itemCount} item${itemCount>1?'s':''}</div>
-            <div class="order-card-total">💰 $${o.total.toFixed(2)}</div>
-            ${cancelled ? `<div class="order-card-cancelled">🚫 Cancelled: ${o.cancelReason || 'N/A'}</div>` : ''}
+            <div style="font-size:24px;color:var(--text-light);flex-shrink:0;margin-left:8px;">›</div>
           </div>`;
       }).join('');
     }
     function openOrderDetail(idx) {
+      showToast('Loading order...');
       const orders = getOrderHistory();
       const data = orders[idx];
-      if (!data) return;
+      if (!data) { showToast('Order not found'); return; }
       // 复用 showConfirmation 的展示逻辑，但显示在 order detail modal 中
       const addr = [data.customer.address, data.customer.apt, `${data.customer.city}, ${data.customer.state} ${data.customer.zip}`].filter(Boolean).join(', ');
       const variantOrder = ['Width', 'Color', 'Size'];
@@ -1461,10 +1466,15 @@
         <strong style="font-size:18px;">💰 Total: $${data.total.toFixed(2)}</strong>`;
 
       document.getElementById('cancelOrderBtn').style.display = data.cancelled ? 'none' : '';
+      document.getElementById('overlay').classList.remove('show');
       document.getElementById('orderDetailModal').classList.add('show');
     }
     function closeOrderDetail() {
       document.getElementById('orderDetailModal').classList.remove('show');
+      // 如果 orders panel 还开着，重新显示 overlay
+      if (document.getElementById('ordersPanel').classList.contains('show')) {
+        document.getElementById('overlay').classList.add('show');
+      }
     }
     function printOrderDetail() {
       window.print();
