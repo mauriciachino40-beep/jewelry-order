@@ -277,11 +277,13 @@
     .orders-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
     .order-card { background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; cursor: pointer; border: 1px solid var(--border); }
     .order-card:active { background: var(--accent-light); }
+    .order-card.cancelled { opacity: 0.6; border-color: #e0d0d0; }
     .order-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .order-card-id { font-weight: 700; font-size: 14px; }
     .order-card-date { font-size: 12px; color: var(--text-light); }
     .order-card-info { font-size: 13px; color: var(--text-light); }
     .order-card-total { font-weight: 700; font-size: 15px; margin-top: 4px; }
+    .order-card-cancelled { font-size: 12px; color: var(--danger); margin-top: 4px; font-weight: 500; }
     .order-detail-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 300; background: var(--card-bg); display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.3s ease; }
     .order-detail-modal.show { transform: translateX(0); }
 
@@ -380,12 +382,38 @@
     .confirm-btn-success { background: #25D366; color: #fff; }
     .confirm-btn:active { transform: scale(0.97); }
     .confirm-btn-print { background: #4a6fa5; color: #fff; }
+    .confirm-btn-danger { background: var(--danger); color: #fff; }
+
+    /* Cancel Modal */
+    .cancel-modal { display: none; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; padding: 20px; }
+    .cancel-modal.show { display: flex; }
+    .cancel-modal-content { background: #fff; border-radius: var(--radius); width: 100%; max-width: 380px; overflow: hidden; box-shadow: var(--shadow-lg); }
+    .cancel-modal-body { padding: 20px; text-align: center; }
+    .cancel-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .cancel-modal-subtitle { font-size: 13px; color: var(--text-light); margin-bottom: 16px; }
+    .cancel-reason-btn {
+      display: block; width: 100%; padding: 12px 16px; margin-bottom: 8px; border-radius: 25px;
+      font-size: 14px; font-weight: 500; cursor: pointer; border: 1.5px solid var(--border);
+      background: #fff; color: var(--text); text-align: left;
+    }
+    .cancel-reason-btn:active, .cancel-reason-btn.selected { background: var(--accent-light); border-color: var(--accent); }
+    .cancel-other-input {
+      width: 100%; padding: 10px 14px; border: 1.5px solid var(--border); border-radius: 25px;
+      font-size: 14px; margin-bottom: 16px; outline: none; display: none;
+    }
+    .cancel-other-input.show { display: block; }
+    .cancel-other-input:focus { border-color: var(--accent); }
+    .cancel-actions { display: flex; gap: 8px; }
+    .cancel-actions button { flex: 1; padding: 12px; border-radius: 25px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; }
+    .cancel-actions .cancel-confirm-btn { background: var(--danger); color: #fff; }
+    .cancel-actions .cancel-confirm-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .cancel-actions .cancel-back-btn { background: var(--bg); color: var(--primary); border: 1.5px solid var(--border); }
 
     /* ========== Print Styles ========== */
     @media print {
       @page { margin: 10mm; size: auto; }
       body, html { background: #fff !important; padding: 0; margin: 0; }
-      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions { display: none !important; }
+      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .cancel-modal { display: none !important; }
       .confirm-modal, #orderDetailModal { display: block !important; position: static !important; max-width: 100% !important; border: none !important; box-shadow: none !important; height: auto !important; transform: none !important; width: 100% !important; }
       .confirm-body, #orderDetailContent { padding: 0 !important; text-align: left; max-height: none; overflow: visible; }
       .confirm-icon, .checkout-header button { display: none !important; }
@@ -497,6 +525,25 @@
     </div>
     <div class="checkout-submit" style="display:flex;gap:8px;padding:12px 20px;">
       <button class="confirm-btn confirm-btn-print" style="flex:1" onclick="printOrderDetail()">🖨️ Print / Save PDF</button>
+      <button class="confirm-btn confirm-btn-danger" style="flex:1" id="cancelOrderBtn" onclick="openCancelModal()">🗑️ Cancel Order</button>
+    </div>
+  </div>
+
+  <!-- ==================== CANCEL ORDER MODAL ==================== -->
+  <div class="cancel-modal" id="cancelModal">
+    <div class="cancel-modal-content">
+      <div class="cancel-modal-body">
+        <div class="cancel-modal-title">🗑️ Cancel Order</div>
+        <div class="cancel-modal-subtitle">Please select a reason for cancellation:</div>
+        <button class="cancel-reason-btn" onclick="selectCancelReason(this, 'Customer Cancelled')">❌ Customer Cancelled</button>
+        <button class="cancel-reason-btn" onclick="selectCancelReason(this, 'Wrong Order')">🔄 Wrong Order / Ordered by Mistake</button>
+        <button class="cancel-reason-btn" onclick="selectCancelReason(this, 'Other')">💬 Other (please specify)</button>
+        <input class="cancel-other-input" id="cancelOtherInput" placeholder="Please specify reason..." oninput="updateCancelConfirmBtn()">
+        <div class="cancel-actions">
+          <button class="cancel-back-btn" onclick="closeCancelModal()">← Back</button>
+          <button class="cancel-confirm-btn" id="cancelConfirmBtn" disabled onclick="confirmCancelOrder()">Confirm Cancel</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1345,14 +1392,16 @@
       container.innerHTML = orders.map((o, idx) => {
         const itemCount = o.items.reduce((s, i) => s + i.quantity, 0);
         const itemSummary = o.items.map(i => i.name.split(' (')[0]).slice(0, 2).join(', ') + (o.items.length > 2 ? '...' : '');
+        const cancelled = o.cancelled;
         return `
-          <div class="order-card" onclick="openOrderDetail(${idx})">
+          <div class="order-card${cancelled ? ' cancelled' : ''}" onclick="openOrderDetail(${idx})">
             <div class="order-card-header">
-              <span class="order-card-id">📋 ${o.orderId}</span>
+              <span class="order-card-id">${cancelled ? '🗑️' : '📋'} ${o.orderId}</span>
               <span class="order-card-date">${o.date}</span>
             </div>
             <div class="order-card-info">${itemSummary} · ${itemCount} item${itemCount>1?'s':''}</div>
             <div class="order-card-total">💰 $${o.total.toFixed(2)}</div>
+            ${cancelled ? `<div class="order-card-cancelled">🚫 Cancelled: ${o.cancelReason || 'N/A'}</div>` : ''}
           </div>`;
       }).join('');
     }
@@ -1383,7 +1432,15 @@
           </div>
         </div>`).join('');
 
+      const cancelledInfo = data.cancelled ? `
+        <div style="background:#fff0f0;border:1px solid #f5c6cb;border-radius:8px;padding:12px;margin-bottom:16px;text-align:center;">
+          <div style="font-weight:700;color:var(--danger);font-size:15px;">🚫 Order Cancelled</div>
+          <div style="color:var(--text-light);font-size:13px;">Reason: ${data.cancelReason || 'N/A'}</div>
+          <div style="color:var(--text-light);font-size:12px;">Cancelled at: ${data.cancelledAt || 'N/A'}</div>
+        </div>` : '';
+
       document.getElementById('orderDetailContent').innerHTML = `
+        ${cancelledInfo}
         <strong>Order #${data.orderId}</strong><br>
         <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
         <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr || '(no address provided)'}<br>${data.customer.phone ? '📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}<br>
@@ -1391,7 +1448,7 @@
         <strong>🛒 Items:</strong><br>${itemsListHTML}<br>
         <strong style="font-size:18px;">💰 Total: $${data.total.toFixed(2)}</strong>`;
 
-      // 打印版
+      document.getElementById('cancelOrderBtn').style.display = data.cancelled ? 'none' : '';
       document.getElementById('orderDetailModal').classList.add('show');
     }
     function closeOrderDetail() {
@@ -1399,6 +1456,63 @@
     }
     function printOrderDetail() {
       window.print();
+    }
+
+    // ============================================================
+    // CANCEL ORDER
+    // ============================================================
+    let cancelOrderIdx = null;
+    let cancelReason = '';
+    function openCancelModal() {
+      cancelReason = ''; cancelOrderIdx = null;
+      document.querySelectorAll('.cancel-reason-btn').forEach(b => b.classList.remove('selected'));
+      document.getElementById('cancelOtherInput').value = '';
+      document.getElementById('cancelOtherInput').classList.remove('show');
+      document.getElementById('cancelConfirmBtn').disabled = true;
+      // 找到当前打开的订单索引
+      const orders = getOrderHistory();
+      const content = document.getElementById('orderDetailContent').innerHTML;
+      for (let i = 0; i < orders.length; i++) {
+        if (content.includes(orders[i].orderId)) { cancelOrderIdx = i; break; }
+      }
+      document.getElementById('cancelModal').classList.add('show');
+    }
+    function closeCancelModal() {
+      document.getElementById('cancelModal').classList.remove('show');
+      cancelReason = ''; cancelOrderIdx = null;
+    }
+    function selectCancelReason(btn, reason) {
+      cancelReason = reason;
+      document.querySelectorAll('.cancel-reason-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      if (reason === 'Other') {
+        document.getElementById('cancelOtherInput').classList.add('show');
+        document.getElementById('cancelConfirmBtn').disabled = true;
+      } else {
+        document.getElementById('cancelOtherInput').classList.remove('show');
+        document.getElementById('cancelConfirmBtn').disabled = false;
+      }
+    }
+    function updateCancelConfirmBtn() {
+      const val = document.getElementById('cancelOtherInput').value.trim();
+      document.getElementById('cancelConfirmBtn').disabled = cancelReason !== 'Other' || val.length === 0;
+    }
+    function confirmCancelOrder() {
+      if (cancelOrderIdx === null) return;
+      let finalReason = cancelReason;
+      if (cancelReason === 'Other') {
+        finalReason = document.getElementById('cancelOtherInput').value.trim();
+        if (!finalReason) return;
+      }
+      const orders = getOrderHistory();
+      orders[cancelOrderIdx].cancelled = true;
+      orders[cancelOrderIdx].cancelReason = finalReason;
+      orders[cancelOrderIdx].cancelledAt = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+      localStorage.setItem('jewelry_orders', JSON.stringify(orders));
+      closeCancelModal();
+      closeOrderDetail();
+      renderOrdersList();
+      showToast('🗑️ Order cancelled');
     }
 
     // ============================================================
