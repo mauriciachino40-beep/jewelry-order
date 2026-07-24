@@ -268,6 +268,23 @@
     .cart-checkout-btn:hover { filter: brightness(1.08); }
     .cart-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
 
+    /* ========== Orders Panel ========== */
+    .orders-panel { position: fixed; bottom: 0; left: 0; right: 0; top: 0; z-index: 200; background: var(--card-bg); display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s ease; }
+    .orders-panel.show { transform: translateY(0); }
+    .orders-panel-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .orders-panel-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .orders-empty { text-align: center; padding: 40px 20px; color: var(--text-light); }
+    .orders-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+    .order-card { background: var(--bg); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 10px; cursor: pointer; border: 1px solid var(--border); }
+    .order-card:active { background: var(--accent-light); }
+    .order-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .order-card-id { font-weight: 700; font-size: 14px; }
+    .order-card-date { font-size: 12px; color: var(--text-light); }
+    .order-card-info { font-size: 13px; color: var(--text-light); }
+    .order-card-total { font-weight: 700; font-size: 15px; margin-top: 4px; }
+    .order-detail-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 300; background: var(--card-bg); display: flex; flex-direction: column; transform: translateX(100%); transition: transform 0.3s ease; }
+    .order-detail-modal.show { transform: translateX(0); }
+
     /* ========== Checkout Modal ========== */
     .checkout-modal {
       position: fixed; inset: 0; z-index: 500; background: var(--bg);
@@ -402,13 +419,20 @@
   <!-- ==================== HEADER ==================== -->
   <header class="header">
     <div class="header-brand">Jewelry<span>Order</span></div>
-    <button class="cart-btn" onclick="openCart()" aria-label="View cart">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-      </svg>
-      <span class="cart-badge" id="cartBadge"></span>
-    </button>
+    <div style="display:flex;gap:8px;">
+      <button class="cart-btn" onclick="openOrders()" aria-label="My orders" style="position:relative;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+      </button>
+      <button class="cart-btn" onclick="openCart()" aria-label="View cart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+        <span class="cart-badge" id="cartBadge"></span>
+      </button>
+    </div>
   </header>
 
   <!-- ==================== CATEGORY TABS ==================== -->
@@ -436,7 +460,7 @@
   </div>
 
   <!-- ==================== OVERLAY ==================== -->
-  <div class="overlay" id="overlay" onclick="closeCart()"></div>
+  <div class="overlay" id="overlay" onclick="closeCart();closeOrders();closeOrderDetail()"></div>
 
   <!-- ==================== CART PANEL ==================== -->
   <div class="cart-panel" id="cartPanel">
@@ -454,6 +478,32 @@
         <span class="cart-subtotal-value" id="cartSubtotal">$0.00</span>
       </div>
       <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="openCheckout()">Proceed to Checkout</button>
+    </div>
+  </div>
+
+  <!-- ==================== ORDERS PANEL ==================== -->
+  <div class="orders-panel" id="ordersPanel">
+    <div class="orders-panel-header">
+      <h2>📋 My Orders</h2>
+      <button class="cart-panel-close" onclick="closeOrders()">✕</button>
+    </div>
+    <div class="orders-list" id="ordersList">
+      <div class="orders-empty">No orders yet.<br>Your orders will appear here after you place one.</div>
+    </div>
+  </div>
+
+  <!-- ==================== ORDER DETAIL MODAL ==================== -->
+  <div class="order-detail-modal" id="orderDetailModal">
+    <div class="checkout-header">
+      <button class="checkout-back-btn" onclick="closeOrderDetail()">←</button>
+      <h2>Order Detail</h2>
+      <button class="checkout-back-btn" onclick="closeOrderDetail()">✕</button>
+    </div>
+    <div class="checkout-body">
+      <div class="confirm-summary" id="orderDetailContent"></div>
+    </div>
+    <div class="checkout-submit" style="display:flex;gap:8px;padding:12px 20px;">
+      <button class="confirm-btn confirm-btn-print" style="flex:1" onclick="printOrderDetail()">🖨️ Print / Save PDF</button>
     </div>
   </div>
 
@@ -1143,6 +1193,9 @@
         notes: document.getElementById('inputNotes').value.trim()
       };
 
+      // 保存到本地订单历史
+      saveOrderToHistory(orderData);
+
       // 发送订单邮件到你邮箱（Formspree）
       try {
         await fetch('https://formspree.io/f/mzdnabyj', {
@@ -1257,6 +1310,109 @@
       cart = []; saveCart(); updateCartUI(); closeConfirm();
       ['inputName','inputEmail','inputPhone','inputAddress','inputApt','inputCity','inputState','inputZip','inputNotes'].forEach(id => document.getElementById(id).value = '');
       showToast('🆕 Ready for new order!');
+    }
+
+    // ============================================================
+    // ORDER HISTORY
+    // ============================================================
+    function saveOrderToHistory(orderData) {
+      const orders = getOrderHistory();
+      orders.unshift({ ...orderData, savedAt: new Date().toISOString() });
+      // 最多保存 50 条
+      if (orders.length > 50) orders.length = 50;
+      localStorage.setItem('jewelry_orders', JSON.stringify(orders));
+    }
+    function getOrderHistory() {
+      try { return JSON.parse(localStorage.getItem('jewelry_orders')) || []; } catch(e) { return []; }
+    }
+    function openOrders() {
+      renderOrdersList();
+      document.getElementById('ordersPanel').classList.add('show');
+      document.getElementById('overlay').classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeOrders() {
+      document.getElementById('ordersPanel').classList.remove('show');
+      document.getElementById('overlay').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+    function renderOrdersList() {
+      const orders = getOrderHistory();
+      const container = document.getElementById('ordersList');
+      if (orders.length === 0) {
+        container.innerHTML = '<div class="orders-empty">No orders yet.<br>Your orders will appear here after you place one.</div>';
+        return;
+      }
+      container.innerHTML = orders.map((o, idx) => {
+        const itemCount = o.items.reduce((s, i) => s + i.quantity, 0);
+        const itemSummary = o.items.map(i => i.name.split(' (')[0]).slice(0, 2).join(', ') + (o.items.length > 2 ? '...' : '');
+        return `
+          <div class="order-card" onclick="openOrderDetail(${idx})">
+            <div class="order-card-header">
+              <span class="order-card-id">📋 ${o.orderId}</span>
+              <span class="order-card-date">${o.date}</span>
+            </div>
+            <div class="order-card-info">${itemSummary} · ${itemCount} item${itemCount>1?'s':''}</div>
+            <div class="order-card-total">💰 $${o.total.toFixed(2)}</div>
+          </div>`;
+      }).join('');
+    }
+    function openOrderDetail(idx) {
+      const orders = getOrderHistory();
+      const data = orders[idx];
+      if (!data) return;
+      // 复用 showConfirmation 的展示逻辑，但显示在 order detail modal 中
+      const addr = [data.customer.address, data.customer.apt, `${data.customer.city}, ${data.customer.state} ${data.customer.zip}`].filter(Boolean).join(', ');
+      const variantOrder = ['Color', 'Stone', 'Size'];
+      const sortKeys = keys => keys.sort((a, b) => {
+        const ai = variantOrder.indexOf(a), bi = variantOrder.indexOf(b);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1; if (bi === -1) return -1;
+        return ai - bi;
+      });
+      const itemsRows = data.items.map((it, i) => {
+        const vt = sortKeys(Object.keys(it.variants)).map(k => it.variants[k]).join(', ');
+        return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
+      });
+      const itemsListHTML = itemsRows.map(r => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+          <img src="${r.image}" alt="${r.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;">${r.name}</div>
+            <div style="color:var(--text-light);font-size:11px;">${r.variants}</div>
+            <div style="font-size:12px;">$${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong></div>
+          </div>
+        </div>`).join('');
+
+      document.getElementById('orderDetailContent').innerHTML = `
+        <strong>Order #${data.orderId}</strong><br>
+        <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
+        <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr || '(no address provided)'}<br>${data.customer.phone ? '📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}<br>
+        ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
+        <strong>🛒 Items:</strong><br>${itemsListHTML}<br>
+        <strong style="font-size:18px;">💰 Total: $${data.total.toFixed(2)}</strong>`;
+
+      // 打印版
+      const itemsTableHTML = `<table><thead><tr><th>#</th><th>Product</th><th>Options</th><th>Qty</th><th>Price</th><th class="text-right">Subtotal</th></tr></thead><tbody>${itemsRows.map(r => `<tr><td>${r.num}</td><td>${r.name}</td><td style="font-size:11px;color:#555">${r.variants}</td><td>×${r.qty}</td><td>$${r.price.toFixed(2)}</td><td class="text-right">$${r.subtotal.toFixed(2)}</td></tr>`).join('')}</tbody></table>`;
+      window._printHTML = `
+        <div class="print-title">Jewelry Wholesale Order</div>
+        <div class="print-order-id">Order #${data.orderId} · ${data.date} (ET)</div>
+        <div class="print-section"><h4>📦 SHIP TO</h4><p>${data.customer.name}<br>${addr || '(no address)'}${data.customer.phone ? '<br>📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}</p></div>
+        ${data.notes ? `<div class="print-section"><h4>📝 NOTES</h4><p>${data.notes}</p></div>` : ''}
+        <div class="print-section"><h4>🛒 ORDER ITEMS</h4>${itemsTableHTML}</div>
+        <div class="print-total">TOTAL: $${data.total.toFixed(2)}</div>`;
+
+      document.getElementById('orderDetailModal').classList.add('show');
+    }
+    function closeOrderDetail() {
+      document.getElementById('orderDetailModal').classList.remove('show');
+    }
+    function printOrderDetail() {
+      if (!window._printHTML) return;
+      const orig = document.getElementById('orderDetailContent').innerHTML;
+      document.getElementById('orderDetailContent').innerHTML = window._printHTML;
+      window.print();
+      document.getElementById('orderDetailContent').innerHTML = orig;
     }
 
     // ============================================================
