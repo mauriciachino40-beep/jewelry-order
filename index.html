@@ -413,10 +413,22 @@
     @media print {
       @page { margin: 10mm; size: auto; }
       body, html { background: #fff !important; padding: 0; margin: 0; }
-      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .cancel-modal { display: none !important; }
-      .confirm-modal, #orderDetailModal { display: block !important; position: static !important; max-width: 100% !important; border: none !important; box-shadow: none !important; height: auto !important; transform: none !important; width: 100% !important; }
-      .confirm-body, #orderDetailContent { padding: 0 !important; text-align: left; max-height: none; overflow: visible; }
-      .confirm-icon, .checkout-header button { display: none !important; }
+
+      /* 隐藏所有页面元素 */
+      body > * { display: none !important; }
+
+      /* 只显示确认页面或订单详情 */
+      .confirm-modal.show, #orderDetailModal.show {
+        display: block !important; position: static !important;
+        max-width: 100% !important; border: none !important;
+        box-shadow: none !important; height: auto !important;
+        transform: none !important; width: 100% !important;
+      }
+      .confirm-body, #orderDetailContent {
+        padding: 0 !important; text-align: left; max-height: none; overflow: visible;
+      }
+      /* 隐藏按钮和图标 */
+      .confirm-actions, .confirm-icon, .checkout-header button { display: none !important; }
       .confirm-summary { font-size: 12px; line-height: 1.5; }
       .confirm-summary table { width: 100%; border-collapse: collapse; margin: 10px 0; }
       .confirm-summary th { background: #f0f0f0; text-align: left; padding: 5px 6px; font-size: 11px; border-bottom: 2px solid #333; }
