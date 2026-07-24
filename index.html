@@ -385,7 +385,7 @@
     @media print {
       @page { margin: 10mm; size: auto; }
       body, html { background: #fff !important; padding: 0; margin: 0; }
-      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .confirm-icon, .checkout-header, .confirm-order-id,
+      .header, .cart-bar, .cart-panel, .overlay, .checkout-modal, .toast, .confirm-actions, .confirm-icon, .confirm-title, .checkout-header, .confirm-order-id,
       .confirm-summary > strong, .confirm-summary > span, .confirm-summary br + strong, .confirm-item-row, .confirm-summary br { display: none !important; }
       .confirm-modal { display: block !important; position: static !important; max-width: 100% !important; border: none !important; box-shadow: none !important; height: auto !important; transform: none !important; width: 100% !important; }
       .confirm-body { padding: 0 !important; text-align: left; max-height: none; overflow: visible; }
@@ -395,6 +395,8 @@
       .confirm-summary td { padding: 5px 6px; font-size: 11px; border-bottom: 1px solid #ddd; }
       .confirm-summary .text-right { text-align: right; }
       .print-title { font-size: 18px; font-weight: 700; text-align: center; margin-bottom: 2px; letter-spacing: 1px; text-transform: uppercase; }
+      .print-confirmed { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 4px; color: #2c2c2c; }
+      .print-success { font-size: 16px; text-align: center; color: var(--success); margin-bottom: 2px; font-weight: 600; }
       .print-order-id { font-size: 12px; text-align: center; color: #666; margin-bottom: 14px; }
       .print-section { margin-bottom: 12px; }
       .print-section h4 { font-size: 12px; font-weight: 700; margin-bottom: 3px; border-bottom: 1px solid #ccc; padding-bottom: 2px; }
@@ -1284,7 +1286,8 @@
           <tbody>${itemsRows.map(r => `<tr><td>${r.num}</td><td>${r.name}</td><td style="font-size:11px;color:#555">${r.variants}</td><td>×${r.qty}</td><td>$${r.price.toFixed(2)}</td><td class="text-right">$${r.subtotal.toFixed(2)}</td></tr>`).join('')}</tbody>
         </table>`;
       const printHTML = `
-        <div class="print-title">Jewelry Wholesale Order</div>
+        <div class="print-confirmed">✅ Order Confirmed</div>
+        <div class="print-success">Order Placed Successfully!</div>
         <div class="print-order-id">Order #${data.orderId} · ${data.date} (ET)</div>
         <div class="print-section"><h4>📦 SHIP TO</h4><p>${data.customer.name}<br>${addr || '(no address)'}${data.customer.phone ? '<br>📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}</p></div>
         ${data.notes ? `<div class="print-section"><h4>📝 NOTES</h4><p>${data.notes}</p></div>` : ''}
