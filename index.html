@@ -1274,21 +1274,16 @@
 
       // 发送订单到 Google Sheets（你的后台）
       try {
-        const resp = await fetch('https://script.google.com/macros/s/AKfycbw-rWkVdLVjQ6iRsXRVUNmO5s29ULQk5fVbaRGxxk3pwUYFv8uEto9W6plf33mjqblCGw/exec', {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(orderData)
-        });
-        const result = await resp.json();
-        if (result.success) {
-          console.log('✅ Order synced to Google Sheets');
+        const sent = navigator.sendBeacon(
+          'https://script.google.com/macros/s/AKfycbw-rWkVdLVjQ6iRsXRVUNmO5s29ULQk5fVbaRGxxk3pwUYFv8uEto9W6plf33mjqblCGw/exec',
+          JSON.stringify(orderData)
+        );
+        if (sent) {
           showToast('✅ Synced!', 3000);
         } else {
-          console.log('❌ Google Sheets error:', result.error);
-          showToast('❌ ' + result.error, 5000);
+          showToast('❌ Send failed', 5000);
         }
       } catch (e) {
-        console.log('Google Sheets sync failed:', e.message);
         showToast('❌ ' + e.message, 5000);
       }
 
