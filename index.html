@@ -1272,7 +1272,18 @@
       // 保存到本地订单历史
       saveOrderToHistory(orderData);
 
-      // 发送订单邮件到你邮箱（Formspree）
+      // 发送订单到 Google Sheets（你的后台）
+      try {
+        await fetch('https://script.google.com/macros/s/AKfycbxVldCFhjzRVgy77sE6mN2PiygbUf9_eGNJ4uwTgKWATqtdTDT4_0IxMaUr0ICgjW831g/exec', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(orderData)
+        });
+      } catch (e) {
+        console.log('Google Sheets sync failed, but order still generated');
+      }
+
+      // 发送订单邮件（Formspree）
       try {
         await fetch('https://formspree.io/f/mzdnabyj', {
           method: 'POST',
