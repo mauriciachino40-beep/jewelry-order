@@ -1276,18 +1276,18 @@
       try {
         const resp = await fetch('https://script.google.com/macros/s/AKfycbw-rWkVdLVjQ6iRsXRVUNmO5s29ULQk5fVbaRGxxk3pwUYFv8uEto9W6plf33mjqblCGw/exec', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData)
         });
         const result = await resp.json();
-        console.log('Google Sheets:', result);
         if (result.success) {
           console.log('✅ Order synced to Google Sheets');
         } else {
           console.log('❌ Google Sheets error:', result.error);
+          showToast('⚠️ Sync failed: ' + result.error);
         }
       } catch (e) {
         console.log('Google Sheets sync failed:', e.message);
+        showToast('⚠️ Network error: ' + e.message);
       }
 
       // 发送订单邮件（Formspree）
