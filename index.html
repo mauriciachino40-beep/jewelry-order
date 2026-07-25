@@ -445,13 +445,80 @@
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
     .hidden { display: none !important; }
+
+    /* ========== Admin Panel ========== */
+    .admin-panel {
+      position: fixed; inset: 0; z-index: 700; background: var(--card-bg);
+      transform: translateX(100%); transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .admin-panel.show { transform: translateX(0); }
+    .admin-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      background: var(--card-bg); flex-shrink: 0;
+    }
+    .admin-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .admin-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+    .admin-loading { text-align: center; padding: 40px; color: var(--text-light); }
+    .admin-order-card {
+      background: var(--bg); border-radius: var(--radius-sm); padding: 14px;
+      margin-bottom: 10px; cursor: pointer; border: 1px solid var(--border);
+    }
+    .admin-order-card:active { background: var(--accent-light); }
+    .admin-order-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+    .admin-order-id { font-weight: 700; font-size: 14px; }
+    .admin-order-date { font-size: 11px; color: var(--text-light); }
+    .admin-order-customer { font-size: 13px; color: var(--text); }
+    .admin-order-items { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .admin-order-total { font-weight: 700; font-size: 15px; margin-top: 4px; }
+    .admin-order-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+    .status-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 12px;
+      font-size: 11px; font-weight: 600;
+    }
+    .status-New { background: #e3f2fd; color: #1976d2; }
+    .status-Processing { background: #fff3e0; color: #e65100; }
+    .status-Shipped { background: #e8f5e9; color: #2e7d32; }
+    .status-Cancelled { background: #fce4ec; color: #c62828; }
+    .admin-status-select {
+      font-size: 12px; padding: 4px 8px; border-radius: 12px;
+      border: 1px solid var(--border); background: #fff; cursor: pointer;
+    }
+    .admin-refresh-btn {
+      background: var(--bg); border: 1.5px solid var(--border); border-radius: 20px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+
+    /* ========== Password Modal ========== */
+    .pw-modal {
+      display: none; position: fixed; inset: 0; z-index: 800;
+      background: rgba(0,0,0,0.5); align-items: center; justify-content: center; padding: 20px;
+    }
+    .pw-modal.show { display: flex; }
+    .pw-modal-content {
+      background: #fff; border-radius: var(--radius); width: 100%; max-width: 340px;
+      overflow: hidden; box-shadow: var(--shadow-lg); padding: 24px; text-align: center;
+    }
+    .pw-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .pw-modal-subtitle { font-size: 13px; color: var(--text-light); margin-bottom: 16px; }
+    .pw-input {
+      width: 100%; padding: 12px 16px; border: 1.5px solid var(--border);
+      border-radius: 25px; font-size: 16px; text-align: center; outline: none; margin-bottom: 12px;
+    }
+    .pw-input:focus { border-color: var(--accent); }
+    .pw-btn {
+      width: 100%; padding: 12px; background: var(--accent); color: #fff;
+      border: none; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .pw-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
   </style>
 </head>
 <body>
 
   <!-- ==================== HEADER ==================== -->
   <header class="header">
-    <div class="header-brand">Jewelry<span>Order</span></div>
+    <div class="header-brand" onclick="onBrandTap()" style="cursor:pointer;">Jewelry<span>Order</span></div>
     <div style="display:flex;gap:8px;">
       <button class="cart-btn" onclick="openOrders()" aria-label="My orders" style="position:relative;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
@@ -490,6 +557,29 @@
       </div>
     </div>
     <button class="cart-bar-btn" id="cartBarBtn" disabled onclick="openCart()">View Cart</button>
+  </div>
+
+  <!-- ==================== ADMIN PASSWORD MODAL ==================== -->
+  <div class="pw-modal" id="pwModal">
+    <div class="pw-modal-content">
+      <div class="pw-modal-title">🔐 Admin Access</div>
+      <div class="pw-modal-subtitle">Enter password to view orders</div>
+      <input class="pw-input" id="pwInput" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')verifyPassword()">
+      <button class="pw-btn" onclick="verifyPassword()">Unlock</button>
+      <div class="pw-error" id="pwError"></div>
+    </div>
+  </div>
+
+  <!-- ==================== ADMIN PANEL ==================== -->
+  <div class="admin-panel" id="adminPanel">
+    <div class="admin-header">
+      <button class="checkout-back-btn" onclick="closeAdmin()">←</button>
+      <h2>📊 All Orders</h2>
+      <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
+    </div>
+    <div class="admin-body" id="adminBody">
+      <div class="admin-loading">Loading orders...</div>
+    </div>
   </div>
 
   <!-- ==================== OVERLAY ==================== -->
@@ -1560,6 +1650,130 @@
       const t = document.getElementById('toast');
       t.textContent = msg; t.classList.add('show');
       clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), duration || 2000);
+    }
+
+    // ============================================================
+    // ADMIN
+    // ============================================================
+    var ADMIN_PW = 'jewelry2026';
+    var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbw-rWkVdLVjQ6iRsXRVUNmO5s29ULQk5fVbaRGxxk3pwUYFv8uEto9W6plf33mjqblCGw/exec';
+    var brandTapCount = 0;
+    var brandTapTimer = null;
+
+    // 点击品牌名 3 次打开管理入口
+    function onBrandTap() {
+      brandTapCount++;
+      if (brandTapCount >= 3) {
+        brandTapCount = 0;
+        clearTimeout(brandTapTimer);
+        openAdminLogin();
+        return;
+      }
+      clearTimeout(brandTapTimer);
+      brandTapTimer = setTimeout(function() { brandTapCount = 0; }, 1500);
+    }
+
+    function openAdminLogin() {
+      document.getElementById('pwInput').value = '';
+      document.getElementById('pwError').textContent = '';
+      document.getElementById('pwModal').classList.add('show');
+      setTimeout(function() { document.getElementById('pwInput').focus(); }, 300);
+    }
+
+    function verifyPassword() {
+      var pw = document.getElementById('pwInput').value;
+      if (pw === ADMIN_PW) {
+        document.getElementById('pwModal').classList.remove('show');
+        document.getElementById('adminPanel').classList.add('show');
+        document.body.style.overflow = 'hidden';
+        loadAdminOrders();
+      } else {
+        document.getElementById('pwError').textContent = 'Wrong password';
+      }
+    }
+
+    function closeAdmin() {
+      document.getElementById('adminPanel').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+
+    function loadAdminOrders() {
+      var body = document.getElementById('adminBody');
+      body.innerHTML = '<div class="admin-loading">Loading orders...</div>';
+
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Error: ' + data.error + '</div>';
+            return;
+          }
+          if (!data.orders || data.orders.length === 0) {
+            body.innerHTML = '<div class="admin-loading">No orders yet.</div>';
+            return;
+          }
+          body.innerHTML = data.orders.map(function(o, i) {
+            var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
+            return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
+              '<div class="admin-order-header">' +
+                '<span class="admin-order-id">📋 ' + o['Order ID'] + '</span>' +
+                '<span class="status-badge ' + statusClass + '">' + (o['Status'] || 'New') + '</span>' +
+              '</div>' +
+              '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
+              '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
+              '<div class="admin-order-total">💰 $' + o['Total'] + '</div>' +
+              '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
+                '<select class="admin-status-select" onchange="updateOrderStatus(' + o._row + ', this.value, ' + i + ')">' +
+                  '<option value="New"' + (o['Status'] === 'New' ? ' selected' : '') + '>New</option>' +
+                  '<option value="Processing"' + (o['Status'] === 'Processing' ? ' selected' : '') + '>Processing</option>' +
+                  '<option value="Shipped"' + (o['Status'] === 'Shipped' ? ' selected' : '') + '>Shipped</option>' +
+                  '<option value="Cancelled"' + (o['Status'] === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+                '</select>' +
+              '</div>' +
+              '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;">' +
+                '<div><strong>📦 Address:</strong><br>' + (o['Shipping Address'] || 'N/A') + '</div>' +
+                '<div style="margin-top:4px;"><strong>📧 Email:</strong> ' + (o['Email'] || 'N/A') + '</div>' +
+                '<div style="margin-top:4px;"><strong>📞 Phone:</strong> ' + (o['Phone'] || 'N/A') + '</div>' +
+                '<div style="margin-top:4px;"><strong>🛒 Items:</strong><br>' + (o['Items'] || '').replace(/\n/g, '<br>') + '</div>' +
+                '<div style="margin-top:4px;"><strong>📝 Notes:</strong> ' + (o['Notes'] || 'N/A') + '</div>' +
+              '</div>' +
+            '</div>';
+          }).join('');
+          // 保存数据以便展开详情
+          window._adminOrders = data.orders;
+        })
+        .catch(function(e) {
+          body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Network error: ' + e.message + '</div>';
+        });
+    }
+
+    function toggleAdminDetail(i) {
+      var detail = document.getElementById('adminDetail' + i);
+      if (detail.style.display === 'none') {
+        detail.style.display = 'block';
+      } else {
+        detail.style.display = 'none';
+      }
+    }
+
+    function updateOrderStatus(row, status, i) {
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=status&row=' + row + '&status=' + encodeURIComponent(status))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            showToast('✅ Status → ' + status, 2000);
+            // 更新 badge
+            var card = document.getElementById('adminCard' + i);
+            var badge = card.querySelector('.status-badge');
+            badge.textContent = status;
+            badge.className = 'status-badge status-' + status.replace(/\s/g, '');
+          } else {
+            showToast('❌ Update failed', 3000);
+          }
+        })
+        .catch(function(e) {
+          showToast('❌ ' + e.message, 3000);
+        });
     }
 
     // ============================================================
