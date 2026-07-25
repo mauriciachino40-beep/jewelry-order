@@ -1712,8 +1712,13 @@
             body.innerHTML = '<div class="admin-loading">No orders yet.</div>';
             return;
           }
+          // 保存数据
+          window._adminOrders = data.orders;
+
           body.innerHTML = data.orders.map(function(o, i) {
             var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
+            // 解析 Items Data 生成带图片的商品列表
+            var itemsHTML = buildAdminItemsHTML(o['Items Data']);
             return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
               '<div class="admin-order-header">' +
                 '<span class="admin-order-id">📋 ' + o['Order ID'] + '</span>' +
@@ -1730,21 +1735,52 @@
                   '<option value="Cancelled"' + (o['Status'] === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
                 '</select>' +
               '</div>' +
-              '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;">' +
-                '<div><strong>📦 Address:</strong><br>' + (o['Shipping Address'] || 'N/A') + '</div>' +
-                '<div style="margin-top:4px;"><strong>📧 Email:</strong> ' + (o['Email'] || 'N/A') + '</div>' +
-                '<div style="margin-top:4px;"><strong>📞 Phone:</strong> ' + (o['Phone'] || 'N/A') + '</div>' +
-                '<div style="margin-top:4px;"><strong>🛒 Items:</strong><br>' + (o['Items'] || '').replace(/\n/g, '<br>') + '</div>' +
-                '<div style="margin-top:4px;"><strong>📝 Notes:</strong> ' + (o['Notes'] || 'N/A') + '</div>' +
+              '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">' +
+                '<div style="margin-bottom:10px;"><strong>📦 Ship To:</strong><br>' +
+                  o['Customer Name'] + '<br>' +
+                  (o['Shipping Address'] || 'N/A') + '<br>' +
+                  (o['Email'] ? '📧 ' + o['Email'] + '<br>' : '') +
+                  (o['Phone'] ? '📞 ' + o['Phone'] + '<br>' : '') +
+                '</div>' +
+                (o['Notes'] ? '<div style="margin-bottom:10px;"><strong>📝 Notes:</strong> ' + o['Notes'] + '</div>' : '') +
+                '<div><strong>🛒 Items:</strong></div>' +
+                itemsHTML +
               '</div>' +
             '</div>';
           }).join('');
-          // 保存数据以便展开详情
-          window._adminOrders = data.orders;
         })
         .catch(function(e) {
           body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Network error: ' + e.message + '</div>';
         });
+    }
+
+    function buildAdminItemsHTML(itemsData) {
+      if (!itemsData) return '<div style="color:var(--text-light);font-size:12px;">(No item details)</div>';
+      try {
+        var items = typeof itemsData === 'string' ? JSON.parse(itemsData) : itemsData;
+        var variantOrder = ['Width', 'Color', 'Size'];
+        var sortKeys = function(keys) {
+          return keys.sort(function(a, b) {
+            var ai = variantOrder.indexOf(a), bi = variantOrder.indexOf(b);
+            if (ai === -1 && bi === -1) return 0;
+            if (ai === -1) return 1; if (bi === -1) return -1;
+            return ai - bi;
+          });
+        };
+        return items.map(function(it) {
+          var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k]); }).join(', ');
+          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+            '<img src="' + it.image + '" alt="' + it.name + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">' +
+            '<div style="flex:1;min-width:0;">' +
+              '<div style="font-weight:600;font-size:13px;">' + it.name + '</div>' +
+              '<div style="font-weight:700;font-size:14px;">' + vt + '</div>' +
+              '<div style="font-size:12px;">$' + it.price.toFixed(2) + ' × ' + it.quantity + ' = <strong>$' + it.subtotal.toFixed(2) + '</strong></div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      } catch(e) {
+        return '<div style="color:var(--text-light);font-size:12px;">(Legacy order — re-place to see details)</div>';
+      }
     }
 
     function toggleAdminDetail(i) {
