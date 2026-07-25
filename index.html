@@ -1274,13 +1274,20 @@
 
       // 发送订单到 Google Sheets（你的后台）
       try {
-        await fetch('https://script.google.com/macros/s/AKfycbxVldCFhjzRVgy77sE6mN2PiygbUf9_eGNJ4uwTgKWATqtdTDT4_0IxMaUr0ICgjW831g/exec', {
+        const resp = await fetch('https://script.google.com/macros/s/AKfycbxVldCFhjzRVgy77sE6mN2PiygbUf9_eGNJ4uwTgKWATqtdTDT4_0IxMaUr0ICgjW831g/exec', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(orderData)
         });
+        const result = await resp.json();
+        console.log('Google Sheets:', result);
+        if (result.success) {
+          console.log('✅ Order synced to Google Sheets');
+        } else {
+          console.log('❌ Google Sheets error:', result.error);
+        }
       } catch (e) {
-        console.log('Google Sheets sync failed, but order still generated');
+        console.log('Google Sheets sync failed:', e.message);
       }
 
       // 发送订单邮件（Formspree）
