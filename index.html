@@ -489,6 +489,42 @@
       background: var(--bg); border: 1.5px solid var(--border); border-radius: 20px;
       padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 500;
     }
+    .admin-delete-btn {
+      background: #fff; border: 1.5px solid var(--danger); color: var(--danger);
+      border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-weight: 500;
+      transition: all var(--transition);
+    }
+    .admin-delete-btn:active { background: var(--danger); color: #fff; }
+
+    /* ========== Admin Filter Tabs ========== */
+    .admin-filter-tabs {
+      display: flex; gap: 6px; padding: 10px 16px; overflow-x: auto;
+      -webkit-overflow-scrolling: touch; flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-filter-tab {
+      flex-shrink: 0; padding: 5px 14px; border-radius: 14px;
+      font-size: 12px; font-weight: 500; border: 1.5px solid var(--border);
+      background: #fff; color: var(--text-light); cursor: pointer;
+      transition: all var(--transition); white-space: nowrap;
+    }
+    .admin-filter-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .admin-filter-count { font-size: 10px; opacity: 0.7; }
+
+    /* ========== Admin Note ========== */
+    .admin-note-edit-btn {
+      background: none; border: none; font-size: 13px; cursor: pointer; padding: 2px 6px;
+      border-radius: 4px; color: var(--text-light);
+    }
+    .admin-note-edit-btn:hover { background: var(--accent-light); }
+    .admin-note-save-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 14px;
+      padding: 5px 14px; font-size: 12px; font-weight: 500; cursor: pointer;
+    }
+    .admin-note-cancel-btn {
+      background: var(--bg); color: var(--text-light); border: 1px solid var(--border);
+      border-radius: 14px; padding: 5px 14px; font-size: 12px; cursor: pointer;
+    }
 
     /* ========== Password Modal ========== */
     .pw-modal {
@@ -576,6 +612,13 @@
       <button class="checkout-back-btn" onclick="closeAdmin()">←</button>
       <h2>📊 All Orders</h2>
       <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
+    </div>
+    <div class="admin-filter-tabs" id="adminFilterTabs" style="display:none;">
+      <button class="admin-filter-tab active" onclick="filterAdminOrders('All')">All</button>
+      <button class="admin-filter-tab" onclick="filterAdminOrders('New')">🆕 New</button>
+      <button class="admin-filter-tab" onclick="filterAdminOrders('Processing')">⏳ Processing</button>
+      <button class="admin-filter-tab" onclick="filterAdminOrders('Shipped')">📦 Shipped</button>
+      <button class="admin-filter-tab" onclick="filterAdminOrders('Cancelled')">❌ Cancelled</button>
     </div>
     <div class="admin-body" id="adminBody">
       <div class="admin-loading">Loading orders...</div>
@@ -1655,7 +1698,7 @@
     // ============================================================
     // ADMIN
     // ============================================================
-    var ADMIN_PW = 'jewelry2026';
+    var ADMIN_PW = 'LISA';
     var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbw-rWkVdLVjQ6iRsXRVUNmO5s29ULQk5fVbaRGxxk3pwUYFv8uEto9W6plf33mjqblCGw/exec';
     var brandTapCount = 0;
     var brandTapTimer = null;
@@ -1700,6 +1743,7 @@
     function loadAdminOrders() {
       var body = document.getElementById('adminBody');
       body.innerHTML = '<div class="admin-loading">Loading orders...</div>';
+      document.getElementById('adminFilterTabs').style.display = 'none';
 
       fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=list')
         .then(function(r) { return r.json(); })
@@ -1712,45 +1756,131 @@
             body.innerHTML = '<div class="admin-loading">No orders yet.</div>';
             return;
           }
-          // 保存数据
           window._adminOrders = data.orders;
-
-          body.innerHTML = data.orders.map(function(o, i) {
-            var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
-            // 解析 Items Data 生成带图片的商品列表
-            var itemsHTML = buildAdminItemsHTML(o['Items Data']);
-            return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
-              '<div class="admin-order-header">' +
-                '<span class="admin-order-id">📋 ' + o['Order ID'] + '</span>' +
-                '<span class="status-badge ' + statusClass + '">' + (o['Status'] || 'New') + '</span>' +
-              '</div>' +
-              '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
-              '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
-              '<div class="admin-order-total">💰 $' + o['Total'] + '</div>' +
-              '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
-                '<select class="admin-status-select" onchange="updateOrderStatus(' + o._row + ', this.value, ' + i + ')">' +
-                  '<option value="New"' + (o['Status'] === 'New' ? ' selected' : '') + '>New</option>' +
-                  '<option value="Processing"' + (o['Status'] === 'Processing' ? ' selected' : '') + '>Processing</option>' +
-                  '<option value="Shipped"' + (o['Status'] === 'Shipped' ? ' selected' : '') + '>Shipped</option>' +
-                  '<option value="Cancelled"' + (o['Status'] === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
-                '</select>' +
-              '</div>' +
-              '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">' +
-                '<div style="margin-bottom:10px;"><strong>📦 Ship To:</strong><br>' +
-                  o['Customer Name'] + '<br>' +
-                  (o['Shipping Address'] || 'N/A') + '<br>' +
-                  (o['Email'] ? '📧 ' + o['Email'] + '<br>' : '') +
-                  (o['Phone'] ? '📞 ' + o['Phone'] + '<br>' : '') +
-                '</div>' +
-                (o['Notes'] ? '<div style="margin-bottom:10px;"><strong>📝 Notes:</strong> ' + o['Notes'] + '</div>' : '') +
-                '<div><strong>🛒 Items:</strong></div>' +
-                itemsHTML +
-              '</div>' +
-            '</div>';
-          }).join('');
+          window._adminOrders.forEach(function(o, idx) { o._idx = idx; });
+          renderAdminOrders('All');
         })
         .catch(function(e) {
           body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Network error: ' + e.message + '</div>';
+        });
+    }
+
+    function renderAdminOrders(filterStatus) {
+      var orders = window._adminOrders;
+      var filtered = filterStatus && filterStatus !== 'All'
+        ? orders.filter(function(o) { return (o['Status'] || 'New') === filterStatus; })
+        : orders;
+
+      // 更新 filter tabs 徽标
+      var tabs = document.querySelectorAll('#adminFilterTabs .admin-filter-tab');
+      var counts = { New: 0, Processing: 0, Shipped: 0, Cancelled: 0 };
+      orders.forEach(function(o) { var s = o['Status'] || 'New'; counts[s] = (counts[s] || 0) + 1; });
+      tabs.forEach(function(tab) {
+        var raw = tab.textContent.replace(/[🆕⏳📦❌\d\s]/g, '').trim();
+        if (raw === 'All') tab.innerHTML = 'All <span class="admin-filter-count">' + orders.length + '</span>';
+        else if (raw === 'New') tab.innerHTML = '🆕 New <span class="admin-filter-count">' + (counts['New'] || 0) + '</span>';
+        else if (raw === 'Processing') tab.innerHTML = '⏳ Processing <span class="admin-filter-count">' + (counts['Processing'] || 0) + '</span>';
+        else if (raw === 'Shipped') tab.innerHTML = '📦 Shipped <span class="admin-filter-count">' + (counts['Shipped'] || 0) + '</span>';
+        else if (raw === 'Cancelled') tab.innerHTML = '❌ Cancelled <span class="admin-filter-count">' + (counts['Cancelled'] || 0) + '</span>';
+        tab.classList.toggle('active', raw === (filterStatus || 'All'));
+      });
+      document.getElementById('adminFilterTabs').style.display = 'flex';
+
+      var body = document.getElementById('adminBody');
+      if (filtered.length === 0) {
+        body.innerHTML = '<div class="admin-loading">No orders in "' + filterStatus + '".</div>';
+        return;
+      }
+
+      body.innerHTML = filtered.map(function(o) {
+        var i = o._idx;
+        var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
+        var itemsHTML = buildAdminItemsHTML(o['Items Data']);
+        var adminNote = o['Admin Note'] || '';
+        return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
+          '<div class="admin-order-header">' +
+            '<span class="admin-order-id">📋 ' + o['Order ID'] + '</span>' +
+            '<span class="status-badge ' + statusClass + '">' + (o['Status'] || 'New') + '</span>' +
+          '</div>' +
+          '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
+          '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
+          '<div class="admin-order-total">💰 $' + o['Total'] + '</div>' +
+          '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
+            '<select class="admin-status-select" onchange="updateOrderStatus(' + o._row + ', this.value, ' + i + ')">' +
+              '<option value="New"' + (o['Status'] === 'New' ? ' selected' : '') + '>New</option>' +
+              '<option value="Processing"' + (o['Status'] === 'Processing' ? ' selected' : '') + '>Processing</option>' +
+              '<option value="Shipped"' + (o['Status'] === 'Shipped' ? ' selected' : '') + '>Shipped</option>' +
+              '<option value="Cancelled"' + (o['Status'] === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+            '</select>' +
+            '<button class="admin-delete-btn" onclick="deleteOrder(event, ' + o._row + ', ' + i + ')">🗑 Delete</button>' +
+          '</div>' +
+          '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">' +
+            '<div style="margin-bottom:10px;"><strong>📦 Ship To:</strong><br>' +
+              o['Customer Name'] + '<br>' +
+              (o['Shipping Address'] || 'N/A') + '<br>' +
+              (o['Email'] ? '📧 ' + o['Email'] + '<br>' : '') +
+              (o['Phone'] ? '📞 ' + o['Phone'] + '<br>' : '') +
+            '</div>' +
+            (o['Notes'] ? '<div style="margin-bottom:10px;"><strong>📝 Customer Note:</strong> ' + o['Notes'] + '</div>' : '') +
+            '<div><strong>🛒 Items:</strong></div>' +
+            itemsHTML +
+            '<div class="admin-note-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">' +
+              '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">' +
+                '<strong style="font-size:13px;">📌 Admin Note:</strong>' +
+                '<button class="admin-note-edit-btn" onclick="event.stopPropagation();editAdminNote(event, ' + i + ')">✏️ Edit</button>' +
+              '</div>' +
+              '<div id="adminNoteDisplay' + i + '" style="font-size:13px;color:' + (adminNote ? 'var(--text)' : 'var(--text-light)') + ';">' +
+                (adminNote || 'No admin note yet') +
+              '</div>' +
+              '<div id="adminNoteEdit' + i + '" style="display:none;">' +
+                '<textarea id="adminNoteInput' + i + '" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:13px;resize:vertical;min-height:60px;">' + adminNote + '</textarea>' +
+                '<div style="display:flex;gap:6px;margin-top:6px;">' +
+                  '<button class="admin-note-save-btn" onclick="event.stopPropagation();saveAdminNote(' + o._row + ', ' + i + ')">💾 Save</button>' +
+                  '<button class="admin-note-cancel-btn" onclick="event.stopPropagation();cancelAdminNote(event, ' + i + ')">Cancel</button>' +
+                '</div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function filterAdminOrders(status) {
+      renderAdminOrders(status);
+    }
+
+    function editAdminNote(ev, i) {
+      ev.stopPropagation();
+      document.getElementById('adminNoteDisplay' + i).style.display = 'none';
+      document.getElementById('adminNoteEdit' + i).style.display = 'block';
+      document.getElementById('adminNoteInput' + i).focus();
+    }
+
+    function cancelAdminNote(ev, i) {
+      if (ev) ev.stopPropagation();
+      document.getElementById('adminNoteDisplay' + i).style.display = 'block';
+      document.getElementById('adminNoteEdit' + i).style.display = 'none';
+    }
+
+    function saveAdminNote(row, i) {
+      var note = document.getElementById('adminNoteInput' + i).value;
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=note&row=' + row + '&note=' + encodeURIComponent(note))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            showToast('✅ Note saved', 2000);
+            var display = document.getElementById('adminNoteDisplay' + i);
+            display.textContent = note || 'No admin note yet';
+            display.style.color = note ? 'var(--text)' : 'var(--text-light)';
+            document.getElementById('adminNoteEdit' + i).style.display = 'none';
+            display.style.display = 'block';
+            if (window._adminOrders[i]) window._adminOrders[i]['Admin Note'] = note;
+          } else {
+            showToast('❌ Save failed', 3000);
+          }
+        })
+        .catch(function(e) {
+          showToast('❌ ' + e.message, 3000);
         });
     }
 
@@ -1783,6 +1913,24 @@
       }
     }
 
+    function deleteOrder(ev, row, i) {
+      ev.stopPropagation();
+      if (!confirm('Permanently delete order #' + (i + 1) + '? This cannot be undone.')) return;
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=delete&row=' + row)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            showToast('🗑 Order deleted', 2000);
+            loadAdminOrders();
+          } else {
+            showToast('❌ Delete failed: ' + (data.error || 'unknown'), 3000);
+          }
+        })
+        .catch(function(e) {
+          showToast('❌ ' + e.message, 3000);
+        });
+    }
+
     function toggleAdminDetail(i) {
       var detail = document.getElementById('adminDetail' + i);
       if (detail.style.display === 'none') {
@@ -1798,11 +1946,25 @@
         .then(function(data) {
           if (data.success) {
             showToast('✅ Status → ' + status, 2000);
-            // 更新 badge
+            // 更新缓存
+            if (window._adminOrders[i]) window._adminOrders[i]['Status'] = status;
+            // 更新 badge（如果卡片在当前视图中可见）
             var card = document.getElementById('adminCard' + i);
-            var badge = card.querySelector('.status-badge');
-            badge.textContent = status;
-            badge.className = 'status-badge status-' + status.replace(/\s/g, '');
+            if (card) {
+              var badge = card.querySelector('.status-badge');
+              if (badge) {
+                badge.textContent = status;
+                badge.className = 'status-badge status-' + status.replace(/\s/g, '');
+              }
+            }
+            // 如果在筛选视图中，刷新使卡片移到正确的分组
+            var activeTab = document.querySelector('#adminFilterTabs .admin-filter-tab.active');
+            if (activeTab) {
+              var currentFilter = activeTab.textContent.replace(/[🆕⏳📦❌\d\s]/g, '').trim();
+              if (currentFilter !== 'All') {
+                setTimeout(function() { renderAdminOrders(currentFilter); }, 600);
+              }
+            }
           } else {
             showToast('❌ Update failed', 3000);
           }
