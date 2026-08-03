@@ -1698,18 +1698,20 @@
     // ============================================================
     // ADMIN
     // ============================================================
-    var ADMIN_PW = 'LISA';
-    var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbz970RCqfLEC8qLo8JaXnosHu7AsPLLDhWCMYsQex0nWNR7PPhJWfFn4n6oJ00MYDZQ0g/exec';
+    var ADMIN_PW = 'jewelry2026';
+    var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbw-rWkVdLVjQ6iRsXRVUNmO5s29ULQk5fVbaRGxxk3pwUYFv8uEto9W6plf33mjqblCGw/exec';
     var brandTapCount = 0;
     var brandTapTimer = null;
 
-    // 点击品牌名 3 次打开管理入口
+    // 点击品牌名 3 次直接进入后台
     function onBrandTap() {
       brandTapCount++;
       if (brandTapCount >= 3) {
         brandTapCount = 0;
         clearTimeout(brandTapTimer);
-        openAdminLogin();
+        document.getElementById('adminPanel').classList.add('show');
+        document.body.style.overflow = 'hidden';
+        loadAdminOrders();
         return;
       }
       clearTimeout(brandTapTimer);
