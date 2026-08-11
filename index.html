@@ -1010,9 +1010,9 @@
         image: './lb2.jpg',
         category: 'Love Bangle',
         variants: [
-          { name: 'Sparkles', options: ['4 Diamonds', '6 Diamonds', '8 Diamonds', '10 Diamonds', 'Pave (Full Diamonds)'] },
-          { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] },
           { name: 'Width', options: ['Slim', 'Thick'] },
+          { name: 'Sparkles', options: ['4 Diamonds', '6 Diamonds', '10 Diamonds'], dependsOn: 'Width', conditionalOptions: { 'Slim': ['6 Diamonds'], 'Thick': ['4 Diamonds', '10 Diamonds'] } },
+          { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] },
           { name: 'Size', options: ['16cm', '17cm', '18cm', '19cm'] }
         ],
         priceByVariant: {
@@ -1020,9 +1020,7 @@
           pricing: {
             '4 Diamonds': 28.50,
             '6 Diamonds': 28.50,
-            '8 Diamonds': 28.50,
-            '10 Diamonds': 28.50,
-            'Pave (Full Diamonds)': 41.80
+            '10 Diamonds': 28.50
           }
         }
       },
@@ -1130,11 +1128,21 @@
 
       document.getElementById('productGrid').innerHTML = filtered.map(p => {
         // 变体选项按钮
-        const variantsHTML = p.variants.map(v => `
+        const variantsHTML = p.variants.map(v => {
+          // 条件选项：根据 dependOn 变体的选择过滤可用选项
+          let availOpts = v.options;
+          if (v.conditionalOptions && v.dependsOn) {
+            const depKey = `${p.id}-${v.dependsOn}`;
+            const depVal = selectedVariants[depKey];
+            if (depVal && v.conditionalOptions[depVal]) {
+              availOpts = v.conditionalOptions[depVal];
+            }
+          }
+          return `
           <div class="variant-group">
             <div class="variant-label">${v.name}</div>
             <div class="variant-options">
-              ${v.options.map(opt => {
+              ${availOpts.map(opt => {
                 const key = `${p.id}-${v.name}`;
                 const sel = selectedVariants[key] === opt;
                 const isColor = v.name === 'Color';
@@ -1142,7 +1150,7 @@
               }).join('')}
             </div>
           </div>
-        `).join('');
+        `;}).join('');
 
         // 数量按钮 — 如果产品有 qtyOptions 就用产品的，否则用全局默认
         const qtyOpts = p.qtyOptions || QTY_OPTIONS;
@@ -1190,7 +1198,23 @@
         parent.querySelectorAll('.variant-option').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
       }
+      // 如果有其他变体依赖当前变体，清除无效选择
+      const product = PRODUCTS.find(p => p.id === productId);
+      if (product) {
+        product.variants.forEach(v => {
+          if (v.dependsOn === variantName && v.conditionalOptions) {
+            const depKey = `${productId}-${v.name}`;
+            const curSel = selectedVariants[depKey];
+            const validOpts = v.conditionalOptions[option] || [];
+            if (curSel && !validOpts.includes(curSel)) {
+              delete selectedVariants[depKey];
+            }
+          }
+        });
+      }
       updateProductPrice(productId);
+      // 重新渲染以刷新条件选项
+      renderProducts();
     }
 
     function selectQty(productId, qty, btn) {
