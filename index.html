@@ -884,22 +884,7 @@
         category: 'Clover Bracelet',
         variants: [
           { name: 'Clover Size', options: ['Mini', 'Medium'] },
-          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds'] },
-          { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] }
-        ]
-      },
-
-      // =====================================================
-      // 📿 SWEET SIZE BRACELET
-      // =====================================================
-      {
-        id: 'cb6',
-        name: 'Sweet Size One Motif Bracelet',
-        price: 28.50,
-        image: './cb6.svg',
-        category: 'Clover Bracelet',
-        variants: [
-          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart'] },
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart', 'ladybug'], dependsOn: 'Clover Size', conditionalOptions: { 'Mini': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart'], 'Medium': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug'] } },
           { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] }
         ]
       },
