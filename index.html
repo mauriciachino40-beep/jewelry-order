@@ -592,7 +592,7 @@
     <div class="header-brand" onclick="onBrandTap()" style="cursor:pointer;">Jewelry<span>Order</span></div>
     <button class="user-switcher" id="userSwitcher" onclick="showUserModal()" title="Click to switch user">
       <span class="user-avatar">👤</span>
-      <span id="userNameDisplay">Me</span>
+      <span id="userNameDisplay">Kiki</span>
       <span class="user-switch-arrow">▾</span>
     </button>
     <div style="display:flex;gap:8px;">
@@ -1104,8 +1104,8 @@
     // ============================================================
     // USER MANAGEMENT — 每个用户独立的购物车和订单
     // ============================================================
-    let currentUser = 'Me';
-    const PRESET_USERS = ['Me', 'Lisa', 'Guest'];
+    let currentUser = 'Kiki';
+    const PRESET_USERS = ['Kiki', 'Lisa', 'Guest'];
 
     function getStorageKey(base) {
       return 'jewelry_' + base + '_' + currentUser;
