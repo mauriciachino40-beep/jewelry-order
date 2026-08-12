@@ -68,6 +68,18 @@
       50% { transform: scale(1.3); }
     }
 
+    /* ========== User Switcher ========== */
+    .user-switcher {
+      display: flex; align-items: center; gap: 4px;
+      background: var(--accent-light); border-radius: 20px;
+      padding: 4px 10px 4px 8px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; color: var(--primary);
+      transition: all var(--transition); font-family: inherit;
+    }
+    .user-switcher:hover { background: #ecdcc8; }
+    .user-switcher .user-avatar { font-size: 16px; }
+    .user-switcher .user-switch-arrow { font-size: 10px; color: var(--text-light); margin-left: 2px; }
+
     /* ========== Category Tabs ========== */
     .category-tabs {
       display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto;
@@ -548,6 +560,29 @@
       border: none; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
     .pw-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+
+    /* ========== User Name Modal ========== */
+    .user-modal {
+      display: none; position: fixed; inset: 0; z-index: 900;
+      background: rgba(0,0,0,0.5); align-items: center; justify-content: center; padding: 20px;
+    }
+    .user-modal.show { display: flex; }
+    .user-modal-content {
+      background: #fff; border-radius: var(--radius); width: 100%; max-width: 360px;
+      overflow: hidden; box-shadow: var(--shadow-lg); padding: 28px 24px; text-align: center;
+    }
+    .user-modal-icon { font-size: 40px; margin-bottom: 8px; }
+    .user-modal-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: var(--primary); }
+    .user-modal-subtitle { font-size: 13px; color: var(--text-light); margin-bottom: 20px; }
+    .user-quick-list { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .user-quick-btn {
+      padding: 10px 20px; border: 1.5px solid var(--border); border-radius: 25px;
+      font-size: 15px; font-weight: 600; cursor: pointer; background: #fff;
+      transition: all var(--transition);
+    }
+    .user-quick-btn:active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+    .user-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; color: var(--text-light); font-size: 12px; }
+    .user-divider::before, .user-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
   </style>
 </head>
 <body>
@@ -555,6 +590,11 @@
   <!-- ==================== HEADER ==================== -->
   <header class="header">
     <div class="header-brand" onclick="onBrandTap()" style="cursor:pointer;">Jewelry<span>Order</span></div>
+    <button class="user-switcher" id="userSwitcher" onclick="showUserModal()" title="Click to switch user">
+      <span class="user-avatar">👤</span>
+      <span id="userNameDisplay">Me</span>
+      <span class="user-switch-arrow">▾</span>
+    </button>
     <div style="display:flex;gap:8px;">
       <button class="cart-btn" onclick="openOrders()" aria-label="My orders" style="position:relative;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22">
@@ -603,6 +643,23 @@
       <input class="pw-input" id="pwInput" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')verifyPassword()">
       <button class="pw-btn" onclick="verifyPassword()">Unlock</button>
       <div class="pw-error" id="pwError"></div>
+    </div>
+  </div>
+
+  <!-- ==================== USER NAME MODAL ==================== -->
+  <div class="user-modal" id="userModal">
+    <div class="user-modal-content">
+      <div class="user-modal-icon">👋</div>
+      <div class="user-modal-title">Welcome!</div>
+      <div class="user-modal-subtitle">Who's placing the order today?</div>
+      <div class="user-quick-list" id="userQuickList"></div>
+      <div class="user-divider">or type your name</div>
+      <input class="pw-input" id="newUserName" type="text" placeholder="Your name..." onkeydown="if(event.key==='Enter')selectUserName()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:14px;font-size:13px;color:var(--text-light);">
+        <input type="checkbox" id="rememberMe" checked style="accent-color:var(--accent);">
+        <label for="rememberMe">Remember me (skip next time)</label>
+      </div>
+      <button class="pw-btn" onclick="selectUserName()">Let's Go →</button>
     </div>
   </div>
 
@@ -1044,8 +1101,18 @@
     let selectedVariants = {};   // key: `${productId}-${variantName}`, value: selected option
     let selectedQtys = {};       // key: productId, value: number (1-8)
 
+    // ============================================================
+    // USER MANAGEMENT — 每个用户独立的购物车和订单
+    // ============================================================
+    let currentUser = 'Me';
+    const PRESET_USERS = ['Me', 'Lisa', 'Guest'];
+
+    function getStorageKey(base) {
+      return 'jewelry_' + base + '_' + currentUser;
+    }
+
     function loadCart() {
-      try { const s = localStorage.getItem('jewelry_cart_v2'); if (s) cart = JSON.parse(s); } catch(e) { cart = []; }
+      try { const s = localStorage.getItem(getStorageKey('cart_v2')); if (s) cart = JSON.parse(s); } catch(e) { cart = []; }
       // 迁移旧数据：YG/WG/RG → 全称，size 数字 → 数字+cm
       const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
       let migrated = false;
@@ -1057,7 +1124,7 @@
       });
       if (migrated) saveCart();
     }
-    function saveCart() { localStorage.setItem('jewelry_cart_v2', JSON.stringify(cart)); }
+    function saveCart() { localStorage.setItem(getStorageKey('cart_v2'), JSON.stringify(cart)); }
     function formatVariant(v) {
       const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
       if (COLOR_MAP[v]) return COLOR_MAP[v];
@@ -1554,10 +1621,10 @@
       orders.unshift({ ...orderData, savedAt: new Date().toISOString() });
       // 最多保存 50 条
       if (orders.length > 50) orders.length = 50;
-      localStorage.setItem('jewelry_orders', JSON.stringify(orders));
+      localStorage.setItem(getStorageKey('orders'), JSON.stringify(orders));
     }
     function getOrderHistory() {
-      try { return JSON.parse(localStorage.getItem('jewelry_orders')) || []; } catch(e) { return []; }
+      try { return JSON.parse(localStorage.getItem(getStorageKey('orders'))) || []; } catch(e) { return []; }
     }
     function openOrders() {
       renderOrdersList();
@@ -1706,7 +1773,7 @@
       orders[cancelOrderIdx].cancelled = true;
       orders[cancelOrderIdx].cancelReason = finalReason;
       orders[cancelOrderIdx].cancelledAt = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
-      localStorage.setItem('jewelry_orders', JSON.stringify(orders));
+      localStorage.setItem(getStorageKey('orders'), JSON.stringify(orders));
       closeCancelModal();
       closeOrderDetail();
       renderOrdersList();
@@ -2005,9 +2072,76 @@
     }
 
     // ============================================================
+    // USER SWITCHER
+    // ============================================================
+    function initUserSwitcher() {
+      // 读取上次选择的用户
+      try {
+        const saved = localStorage.getItem('jewelry_current_user');
+        if (saved) currentUser = saved;
+      } catch(e) {}
+      updateUserNameDisplay();
+
+      // 首次访问？弹出用户选择弹窗
+      if (!localStorage.getItem('jewelry_current_user')) {
+        showUserModal();
+      }
+    }
+
+    function showUserModal() {
+      const quickList = document.getElementById('userQuickList');
+      quickList.innerHTML = PRESET_USERS.map(u =>
+        '<button class="user-quick-btn" onclick="quickSelectUser(\'' + u + '\')">' + u + '</button>'
+      ).join('');
+      document.getElementById('newUserName').value = '';
+      // 默认勾选"记住我"
+      document.getElementById('rememberMe').checked = !!localStorage.getItem('jewelry_current_user');
+      document.getElementById('userModal').classList.add('show');
+    }
+
+    function quickSelectUser(username) {
+      document.getElementById('userModal').classList.remove('show');
+      setUser(username, document.getElementById('rememberMe').checked);
+    }
+
+    function selectUserName() {
+      const name = document.getElementById('newUserName').value.trim();
+      if (!name) { showToast('⚠️ Please enter your name'); return; }
+      document.getElementById('userModal').classList.remove('show');
+      setUser(name, document.getElementById('rememberMe').checked);
+    }
+
+    function setUser(username, remember) {
+      currentUser = username;
+      if (remember) {
+        localStorage.setItem('jewelry_current_user', currentUser);
+      } else {
+        localStorage.removeItem('jewelry_current_user');
+      }
+      updateUserNameDisplay();
+      loadCart();
+      updateCartUI();
+      renderProducts();
+      showToast('👤 Welcome, ' + currentUser + '!', 2000);
+    }
+
+    function updateUserNameDisplay() {
+      const el = document.getElementById('userNameDisplay');
+      if (el) el.textContent = currentUser;
+    }
+
+    function switchUser(username) {
+      if (!username || username === currentUser) return;
+      selectedVariants = {};
+      selectedQtys = {};
+      setUser(username, true);
+    }
+
+    // ============================================================
     // INIT
     // ============================================================
     function init() {
+      initUserSwitcher();
       populateStates(); loadCart(); renderCategoryTabs(); renderProducts(); updateCartUI();
     }
     document.addEventListener('DOMContentLoaded', init);
