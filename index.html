@@ -116,6 +116,9 @@
     .product-image-wrap img {
       width: 100%; height: 100%; object-fit: cover; display: block;
     }
+    .product-image-wrap.image-contain img {
+      object-fit: contain;
+    }
     .product-image-placeholder {
       position: absolute; inset: 0;
       display: flex; align-items: center; justify-content: center;
@@ -1207,7 +1210,7 @@
 
         return `
           <div class="product-card">
-            <div class="product-image-wrap">
+            <div class="product-image-wrap${p.sizeImages ? ' image-contain' : ''}">
               <img src="${getProductImage(p)}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
               <div class="product-image-placeholder" style="display:none">🖼️<br>Replace Image</div>
             </div>
