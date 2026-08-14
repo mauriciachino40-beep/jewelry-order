@@ -941,8 +941,13 @@
         id: 'cn1',
         name: 'One Motif Clover Necklace',
         price: 28.50,
-        image: './cn1.jpg',
+        image: './cn1-size-chart-en.jpg',
         category: 'Clover Necklace',
+        sizeImages: {
+          'Mini': './cn1-mini.png',
+          'Medium': './cn1-medium.png',
+          'Magic pendant': './cn1-magic.png'
+        },
         variants: [
           { name: 'Clover Size', options: ['Mini', 'Medium', 'Magic pendant'] },
           { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart', 'ladybug'], dependsOn: 'Clover Size', conditionalOptions: { 'Mini': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart'], 'Medium': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug'], 'Magic pendant': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug'] } },
@@ -1149,6 +1154,16 @@
 
     function filterCategory(cat) { activeCategory = cat; renderCategoryTabs(); renderProducts(); }
 
+    // 根据选中的 Clover Size 决定展示哪张图；未选时用默认图
+    function getProductImage(p) {
+      if (p.sizeImages) {
+        const sizeKey = `${p.id}-Clover Size`;
+        const sel = selectedVariants[sizeKey];
+        if (sel && p.sizeImages[sel]) return p.sizeImages[sel];
+      }
+      return p.image;
+    }
+
     function renderProducts() {
       const filtered = activeCategory === 'All' ? PRODUCTS : PRODUCTS.filter(p => p.category === activeCategory);
 
@@ -1193,7 +1208,7 @@
         return `
           <div class="product-card">
             <div class="product-image-wrap">
-              <img src="${p.image}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <img src="${getProductImage(p)}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
               <div class="product-image-placeholder" style="display:none">🖼️<br>Replace Image</div>
             </div>
             <div class="product-info">
@@ -1293,7 +1308,7 @@
           productId: product.id,
           name: product.name,
           price: effectivePrice,
-          image: product.image,
+          image: getProductImage(product),
           variants: variants,
           quantity: quantity
         });
