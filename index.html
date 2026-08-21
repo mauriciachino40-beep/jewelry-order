@@ -424,6 +424,8 @@
     .cancel-actions .cancel-confirm-btn:disabled { background: #ccc; cursor: not-allowed; }
     .cancel-actions .cancel-back-btn { background: var(--bg); color: var(--primary); border: 1.5px solid var(--border); }
 
+    #printArea { display: none; }
+
     /* ========== Print Styles ========== */
     @media print {
       @page { margin: 10mm; size: auto; }
@@ -431,6 +433,9 @@
 
       /* 隐藏所有页面元素 */
       body > * { display: none !important; }
+
+      /* 只打印发票内容 */
+      #printArea { display: block !important; }
 
       /* 只显示确认页面或订单详情 */
       .confirm-modal.show, #orderDetailModal.show {
@@ -510,6 +515,12 @@
       transition: all var(--transition);
     }
     .admin-delete-btn:active { background: var(--danger); color: #fff; }
+    .admin-print-btn {
+      background: #fff; border: 1.5px solid #4a6fa5; color: #4a6fa5;
+      border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-weight: 500;
+      transition: all var(--transition);
+    }
+    .admin-print-btn:active { background: #4a6fa5; color: #fff; }
 
     /* ========== Admin Filter Tabs ========== */
     .admin-filter-tabs {
@@ -1927,7 +1938,10 @@
               '<option value="Shipped"' + (o['Status'] === 'Shipped' ? ' selected' : '') + '>Shipped</option>' +
               '<option value="Cancelled"' + (o['Status'] === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
             '</select>' +
-            '<button class="admin-delete-btn" onclick="deleteOrder(event, ' + o._row + ', ' + i + ')">🗑 Delete</button>' +
+            '<div style="display:flex;gap:6px;">' +
+              '<button class="admin-print-btn" onclick="printAdminOrder(' + i + ')">🖨️ Print</button>' +
+              '<button class="admin-delete-btn" onclick="deleteOrder(event, ' + o._row + ', ' + i + ')">🗑 Delete</button>' +
+            '</div>' +
           '</div>' +
           '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">' +
             '<div style="margin-bottom:10px;"><strong>📦 Ship To:</strong><br>' +
@@ -2026,6 +2040,87 @@
       } catch(e) {
         return '<div style="color:var(--text-light);font-size:12px;">(Legacy order — re-place to see details)</div>';
       }
+    }
+
+    function printAdminOrder(i) {
+      var orders = window._adminOrders;
+      if (!orders || !orders[i]) { showToast('Order not found'); return; }
+      var o = orders[i];
+
+      // 解析商品数据
+      var itemsHTML;
+      try {
+        var items = typeof o['Items Data'] === 'string' ? JSON.parse(o['Items Data']) : (o['Items Data'] || []);
+        var variantOrder = ['Width', 'Color', 'Size'];
+        var sortKeys = function(keys) {
+          return keys.sort(function(a, b) {
+            var ai = variantOrder.indexOf(a), bi = variantOrder.indexOf(b);
+            if (ai === -1 && bi === -1) return 0;
+            if (ai === -1) return 1; if (bi === -1) return -1;
+            return ai - bi;
+          });
+        };
+        if (!items || items.length === 0) {
+          itemsHTML = '<div style="color:#888;font-size:12px;">(No item details)</div>';
+        } else {
+          itemsHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+            '<thead><tr>' +
+              '<th style="text-align:left;padding:6px 4px;border-bottom:2px solid #333;">#</th>' +
+              '<th style="text-align:left;padding:6px 4px;border-bottom:2px solid #333;">Product</th>' +
+              '<th style="text-align:left;padding:6px 4px;border-bottom:2px solid #333;">Options</th>' +
+              '<th style="text-align:center;padding:6px 4px;border-bottom:2px solid #333;">Qty</th>' +
+              '<th style="text-align:right;padding:6px 4px;border-bottom:2px solid #333;">Price</th>' +
+              '<th style="text-align:right;padding:6px 4px;border-bottom:2px solid #333;">Subtotal</th>' +
+            '</tr></thead>' +
+            '<tbody>' +
+            items.map(function(it, n) {
+              var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k]); }).join(', ');
+              return '<tr>' +
+                '<td style="padding:6px 4px;border-bottom:1px solid #ddd;">' + (n + 1) + '</td>' +
+                '<td style="padding:6px 4px;border-bottom:1px solid #ddd;">' + it.name + '</td>' +
+                '<td style="padding:6px 4px;border-bottom:1px solid #ddd;font-size:11px;color:#666;">' + vt + '</td>' +
+                '<td style="padding:6px 4px;border-bottom:1px solid #ddd;text-align:center;">×' + it.quantity + '</td>' +
+                '<td style="padding:6px 4px;border-bottom:1px solid #ddd;text-align:right;">$' + (Number(it.price) || 0).toFixed(2) + '</td>' +
+                '<td style="padding:6px 4px;border-bottom:1px solid #ddd;text-align:right;">$' + (Number(it.subtotal) || 0).toFixed(2) + '</td>' +
+              '</tr>';
+            }).join('') +
+            '</tbody>' +
+          '</table>';
+        }
+      } catch(e) {
+        itemsHTML = '<div style="color:#888;font-size:12px;">(Legacy order)</div>';
+      }
+
+      var shipLines = [
+        o['Customer Name'],
+        o['Shipping Address'],
+        o['Phone'] ? '📞 ' + o['Phone'] : '',
+        o['Email'] ? '📧 ' + o['Email'] : ''
+      ].filter(Boolean).join('<br>');
+
+      var notesHTML = o['Notes'] ? '<div style="font-size:13px;margin-bottom:16px;">' +
+        '<div style="font-weight:bold;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">📝 Notes</div>' +
+        '<div>' + o['Notes'] + '</div></div>' : '';
+
+      var html = '<div style="font-family:Arial,Helvetica,sans-serif;color:#111;max-width:720px;margin:0 auto;padding:8px;">' +
+        '<div style="text-align:center;font-size:22px;font-weight:bold;letter-spacing:1.5px;">JEWELRY WHOLESALE ORDER</div>' +
+        '<div style="text-align:center;font-size:13px;color:#555;margin:4px 0 22px;">Order #' + (o['Order ID'] || '') + ' · ' + (o['Date (ET)'] || '') + '</div>' +
+        '<div style="font-size:13px;margin-bottom:16px;">' +
+          '<div style="font-weight:bold;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">📦 Ship To</div>' +
+          shipLines +
+        '</div>' +
+        notesHTML +
+        '<div style="font-size:13px;margin-bottom:16px;">' +
+          '<div style="font-weight:bold;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">🛒 Order Items</div>' +
+          itemsHTML +
+        '</div>' +
+        '<div style="text-align:right;font-size:16px;font-weight:bold;border-top:2px solid #333;padding-top:10px;">TOTAL: $' + (o['Total'] || '0.00') + '</div>' +
+      '</div>';
+
+      var area = document.getElementById('printArea');
+      area.innerHTML = html;
+      window.print();
+      setTimeout(function() { area.innerHTML = ''; }, 100);
     }
 
     function deleteOrder(ev, row, i) {
@@ -2165,5 +2260,7 @@
     document.addEventListener('DOMContentLoaded', init);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeConfirm(); closeCheckout(); closeCart(); } });
   </script>
+
+  <div id="printArea"></div>
 </body>
 </html>
