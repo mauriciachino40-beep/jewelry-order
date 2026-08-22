@@ -66,6 +66,75 @@ function doGet(e) {
     return json({ error: 'Missing or invalid row' });
   }
 
+  if (action === 'ship') {
+    var row = parseInt(e.parameter.row);
+    var itemsParam = e.parameter.items || '';
+    var tracking = e.parameter.tracking || '';
+    var note = e.parameter.note || '';
+    if (!row || !itemsParam) return json({ error: 'Missing row or items' });
+    var items = itemsParam.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
+    if (items.length === 0) return json({ error: 'No valid items' });
+
+    // 确保第 13 列有表头
+    var lastCol = sheet.getLastColumn();
+    if (lastCol < 13) {
+      sheet.getRange(1, 13).setValue('Shipments');
+      sheet.getRange(1, 13).setFontWeight('bold').setBackground('#f0f0f0');
+    }
+
+    // 读已有发货记录
+    var cellVal = sheet.getRange(row, 13).getValue();
+    var shipments = [];
+    if (cellVal) {
+      try { shipments = JSON.parse(cellVal); } catch(e) { shipments = []; }
+    }
+    if (!Array.isArray(shipments)) shipments = [];
+
+    // 排除已发过的下标
+    var already = {};
+    shipments.forEach(function(s) { (s.items || []).forEach(function(x) { already[x] = true; }); });
+    var newItems = items.filter(function(x) { return !already[x]; });
+    if (newItems.length === 0) return json({ success: false, error: 'All selected items already shipped' });
+
+    var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
+    shipments.push({ id: 'S' + Date.now(), items: newItems, tracking: tracking, note: note, date: date });
+    sheet.getRange(row, 13).setValue(JSON.stringify(shipments));
+
+    // 自动推进整单状态：全部商品发货完 → Shipped
+    try {
+      var itemsData = sheet.getRange(row, 11).getValue();
+      var allItems = itemsData ? JSON.parse(itemsData) : [];
+      var shippedSet = {};
+      shipments.forEach(function(s) { (s.items || []).forEach(function(x) { shippedSet[x] = true; }); });
+      if (Array.isArray(allItems) && allItems.length > 0 && Object.keys(shippedSet).length >= allItems.length) {
+        sheet.getRange(row, 10).setValue('Shipped');
+      }
+    } catch(e) {}
+
+    return json({ success: true, shipments: shipments, status: sheet.getRange(row, 10).getValue() });
+  }
+
+  if (action === 'unship') {
+    var row = parseInt(e.parameter.row);
+    var itemsParam = e.parameter.items || '';
+    if (!row || !itemsParam) return json({ error: 'Missing row or items' });
+    var items = itemsParam.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
+    var cellVal = sheet.getRange(row, 13).getValue();
+    var shipments = [];
+    if (cellVal) {
+      try { shipments = JSON.parse(cellVal); } catch(e) { shipments = []; }
+    }
+    if (!Array.isArray(shipments)) shipments = [];
+    var removeSet = {};
+    items.forEach(function(x) { removeSet[x] = true; });
+    shipments = shipments.map(function(s) {
+      s.items = (s.items || []).filter(function(x) { return !removeSet[x]; });
+      return s;
+    }).filter(function(s) { return s.items && s.items.length > 0; });
+    sheet.getRange(row, 13).setValue(JSON.stringify(shipments));
+    return json({ success: true, shipments: shipments });
+  }
+
   return json({ error: 'Unknown action' });
 }
 

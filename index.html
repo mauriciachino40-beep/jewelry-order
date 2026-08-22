@@ -521,6 +521,17 @@
       transition: all var(--transition);
     }
     .admin-print-btn:active { background: #4a6fa5; color: #fff; }
+    .admin-ship-btn {
+      background: #fff; border: 1.5px solid #5b8c5a; color: #5b8c5a;
+      border-radius: 20px; padding: 5px 14px; font-size: 12px; cursor: pointer; font-weight: 600;
+      transition: all var(--transition);
+    }
+    .admin-ship-btn:active { background: #5b8c5a; color: #fff; }
+    .admin-unship-btn {
+      background: none; border: none; color: var(--danger); cursor: pointer;
+      font-size: 12px; padding: 0 2px; text-decoration: underline;
+    }
+    .admin-ship-check { width: 16px; height: 16px; cursor: pointer; accent-color: #5b8c5a; }
 
     /* ========== Admin Filter Tabs ========== */
     .admin-filter-tabs {
@@ -1921,7 +1932,7 @@
       body.innerHTML = filtered.map(function(o) {
         var i = o._idx;
         var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
-        var itemsHTML = buildAdminItemsHTML(o['Items Data']);
+        var itemsHTML = buildAdminShipItemsHTML(o, i);
         var adminNote = o['Admin Note'] || '';
         return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
           '<div class="admin-order-header">' +
@@ -2013,33 +2024,159 @@
         });
     }
 
-    function buildAdminItemsHTML(itemsData) {
-      if (!itemsData) return '<div style="color:var(--text-light);font-size:12px;">(No item details)</div>';
+    function escStr(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function buildAdminShipItemsHTML(o, i) {
+      var items = [];
       try {
-        var items = typeof itemsData === 'string' ? JSON.parse(itemsData) : itemsData;
-        var variantOrder = ['Width', 'Color', 'Size'];
-        var sortKeys = function(keys) {
-          return keys.sort(function(a, b) {
-            var ai = variantOrder.indexOf(a), bi = variantOrder.indexOf(b);
-            if (ai === -1 && bi === -1) return 0;
-            if (ai === -1) return 1; if (bi === -1) return -1;
-            return ai - bi;
-          });
-        };
-        return items.map(function(it) {
-          var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k]); }).join(', ');
-          return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
-            '<img src="' + it.image + '" alt="' + it.name + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">' +
-            '<div style="flex:1;min-width:0;">' +
-              '<div style="font-weight:600;font-size:13px;">' + it.name + '</div>' +
-              '<div style="font-weight:700;font-size:14px;">' + vt + '</div>' +
-              '<div style="font-size:12px;">$' + it.price.toFixed(2) + ' × ' + it.quantity + ' = <strong>$' + it.subtotal.toFixed(2) + '</strong></div>' +
-            '</div>' +
-          '</div>';
-        }).join('');
-      } catch(e) {
-        return '<div style="color:var(--text-light);font-size:12px;">(Legacy order — re-place to see details)</div>';
+        var raw = o['Items Data'];
+        items = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+      } catch(e) { items = []; }
+      if (!Array.isArray(items)) items = [];
+
+      var shipments = [];
+      try {
+        var sRaw = o['Shipments'];
+        shipments = sRaw ? JSON.parse(sRaw) : [];
+      } catch(e) { shipments = []; }
+      if (!Array.isArray(shipments)) shipments = [];
+
+      var shippedMap = {};
+      shipments.forEach(function(s) { (s.items || []).forEach(function(idx) { shippedMap[idx] = s; }); });
+
+      var variantOrder = ['Width', 'Color', 'Size'];
+      var sortKeys = function(keys) {
+        return keys.sort(function(a, b) {
+          var ai = variantOrder.indexOf(a), bi = variantOrder.indexOf(b);
+          if (ai === -1 && bi === -1) return 0;
+          if (ai === -1) return 1; if (bi === -1) return -1;
+          return ai - bi;
+        });
+      };
+
+      if (items.length === 0) {
+        return '<div style="color:var(--text-light);font-size:12px;">(No item details)</div>';
       }
+
+      var rowsHTML = items.map(function(it, n) {
+        var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k]); }).join(', ');
+        var shipped = shippedMap[n];
+        var leftHTML = shipped
+          ? '<span style="color:#5b8c5a;font-weight:700;font-size:12px;">✓ Shipped</span>'
+          : '<input type="checkbox" class="admin-ship-check" data-idx="' + n + '">';
+        var shipInfo = shipped
+          ? '<div style="font-size:11px;color:#5b8c5a;margin-top:2px;">' +
+              (shipped.tracking ? '单号 ' + escStr(shipped.tracking) : '') +
+              (shipped.note ? (shipped.tracking ? ' · ' : '') + escStr(shipped.note) : '') +
+              (shipped.date ? ' · ' + shipped.date : '') +
+              ' <button class="admin-unship-btn" onclick="unmarkShipItem(' + o._row + ', ' + i + ', ' + n + ')">↩ 取消</button>' +
+            '</div>'
+          : '';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
+          '<div style="flex-shrink:0;width:18px;">' + leftHTML + '</div>' +
+          '<img src="' + it.image + '" alt="' + it.name + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">' +
+          '<div style="flex:1;min-width:0;">' +
+            '<div style="font-weight:600;font-size:13px;">' + it.name + '</div>' +
+            '<div style="font-weight:700;font-size:14px;">' + vt + '</div>' +
+            '<div style="font-size:12px;">$' + (Number(it.price) || 0).toFixed(2) + ' × ' + it.quantity + ' = <strong>$' + (Number(it.subtotal) || 0).toFixed(2) + '</strong></div>' +
+            shipInfo +
+          '</div>' +
+        '</div>';
+      }).join('');
+
+      var shipmentsSummary = '';
+      if (shipments.length > 0) {
+        var lines = shipments.map(function(s) {
+          var labels = (s.items || []).map(function(x) { return '#' + (x + 1); }).join(', ');
+          var txt = '📦 包裹：' + (s.tracking ? '单号 ' + s.tracking : '无单号') + ' — 商品 ' + labels;
+          if (s.note) txt += '（' + s.note + '）';
+          return '<div style="font-size:12px;color:var(--text-light);margin:3px 0;">' + escStr(txt) + '</div>';
+        }).join('');
+        shipmentsSummary = '<div style="margin:8px 0 4px;padding:8px;background:#f5f7fa;border-radius:6px;">' + lines + '</div>';
+      }
+
+      return '<div id="adminShipItems' + i + '" onclick="event.stopPropagation()">' +
+        rowsHTML +
+        shipmentsSummary +
+        '<div style="margin-top:8px;">' +
+          '<button class="admin-ship-btn" onclick="showShipForm(' + i + ')">📦 Ship Selected</button>' +
+        '</div>' +
+        '<div id="adminShipForm' + i + '" style="display:none;margin-top:8px;padding:10px;background:#f5f7fa;border-radius:6px;">' +
+          '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">📦 填写发货信息（均可选）</div>' +
+          '<input id="adminShipTracking' + i + '" placeholder="单号 / Tracking" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:6px;box-sizing:border-box;">' +
+          '<input id="adminShipNote' + i + '" placeholder="备注（如：第二包，周末寄）" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
+          '<div style="display:flex;gap:6px;">' +
+            '<button class="admin-note-save-btn" onclick="confirmShipItems(' + i + ')">✅ 确认发货</button>' +
+            '<button class="admin-note-cancel-btn" onclick="cancelShipForm(' + i + ')">Cancel</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function showShipForm(i) {
+      var checks = document.querySelectorAll('#adminShipItems' + i + ' .admin-ship-check:checked');
+      if (!checks.length) { showToast('⚠️ 先勾选要发货的商品', 2000); return; }
+      document.getElementById('adminShipForm' + i).style.display = 'block';
+      var btn = document.querySelector('#adminShipItems' + i + ' .admin-ship-btn');
+      if (btn) btn.textContent = '📦 Ship ' + checks.length + ' item' + (checks.length > 1 ? 's' : '');
+    }
+
+    function confirmShipItems(i) {
+      var checks = document.querySelectorAll('#adminShipItems' + i + ' .admin-ship-check:checked');
+      var idxs = [];
+      checks.forEach(function(c) { idxs.push(c.getAttribute('data-idx')); });
+      if (!idxs.length) { showToast('⚠️ 先勾选商品', 2000); return; }
+      var o = window._adminOrders[i];
+      if (!o) return;
+      var tracking = document.getElementById('adminShipTracking' + i).value.trim();
+      var note = document.getElementById('adminShipNote' + i).value.trim();
+      var url = ADMIN_URL + '?password=' + ADMIN_PW + '&action=ship&row=' + o._row + '&items=' + idxs.join(',') +
+        '&tracking=' + encodeURIComponent(tracking) + '&note=' + encodeURIComponent(note);
+      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.success) {
+          showToast('✅ 已标记发货', 2000);
+          if (window._adminOrders[i]) {
+            window._adminOrders[i]['Shipments'] = data.shipments ? JSON.stringify(data.shipments) : '';
+            if (data.status) window._adminOrders[i]['Status'] = data.status;
+          }
+          reRenderAdminKeepOpen(i);
+        } else {
+          showToast('❌ ' + (data.error || '发货失败'), 3000);
+        }
+      }).catch(function(e) { showToast('❌ ' + e.message, 3000); });
+    }
+
+    function unmarkShipItem(row, i, idx) {
+      if (!confirm('取消这件商品的发货标记？')) return;
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=unship&row=' + row + '&items=' + idx)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) {
+            showToast('↩️ 已取消标记', 2000);
+            if (window._adminOrders[i]) window._adminOrders[i]['Shipments'] = data.shipments ? JSON.stringify(data.shipments) : '';
+            reRenderAdminKeepOpen(i);
+          } else {
+            showToast('❌ ' + (data.error || '操作失败'), 3000);
+          }
+        })
+        .catch(function(e) { showToast('❌ ' + e.message, 3000); });
+    }
+
+    function cancelShipForm(i) {
+      document.getElementById('adminShipForm' + i).style.display = 'none';
+      var btn = document.querySelector('#adminShipItems' + i + ' .admin-ship-btn');
+      if (btn) btn.textContent = '📦 Ship Selected';
+    }
+
+    function reRenderAdminKeepOpen(i) {
+      var activeTab = document.querySelector('#adminFilterTabs .admin-filter-tab.active');
+      var currentFilter = 'All';
+      if (activeTab) currentFilter = activeTab.textContent.replace(/[🆕⏳📦❌\d\s]/g, '').trim();
+      renderAdminOrders(currentFilter);
+      var detail = document.getElementById('adminDetail' + i);
+      if (detail) detail.style.display = 'block';
     }
 
     function printAdminOrder(i) {
