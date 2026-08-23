@@ -288,9 +288,13 @@
       margin-bottom: 10px;
     }
     .cart-hold-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; background: #fff; }
-    .cart-onhold { display: none; padding: 10px 16px; border-bottom: 1px solid var(--border); background: #f7f4ee; max-height: 220px; overflow-y: auto; flex-shrink: 0; }
+    .cart-onhold { display: none; padding: 8px 16px; border-bottom: 1px solid var(--border); background: #f7f4ee; flex-shrink: 0; }
     .cart-onhold.show { display: block; }
-    .cart-onhold-title { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .onhold-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; cursor: pointer; }
+    .onhold-bar-title { font-size: 13px; font-weight: 700; color: var(--text); }
+    .onhold-chevron { font-size: 14px; color: var(--text-light); }
+    .onhold-list { display: none; max-height: 200px; overflow-y: auto; margin-top: 4px; }
+    .onhold-list.open { display: block; }
     .onhold-card { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 8px; background: #fff; border: 1px solid var(--border); border-radius: 12px; }
     .onhold-card:last-child { margin-bottom: 0; }
     .onhold-card-info { flex: 1; min-width: 0; }
@@ -1527,22 +1531,32 @@
       renderOnHold();
       if (target) showToast(`🗑️ Deleted "${target.name}"`);
     }
+    let onHoldExpanded = false;
+    function toggleOnHold() {
+      onHoldExpanded = !onHoldExpanded;
+      renderOnHold();
+    }
     function renderOnHold() {
       const box = document.getElementById('cartOnHold');
       if (!box) return;
       const held = getHeldCarts();
       if (held.length === 0) { box.classList.remove('show'); box.innerHTML = ''; return; }
       box.innerHTML = `
-        <div class="cart-onhold-title">📌 On Hold (${held.length})</div>
-        ${held.map(h => `
-          <div class="onhold-card">
-            <div class="onhold-card-info">
-              <div class="onhold-card-name">${escStr(h.name)}</div>
-              <div class="onhold-card-meta">${h.count} item${h.count === 1 ? '' : 's'} · $${(h.total || 0).toFixed(2)}</div>
-            </div>
-            <button class="onhold-card-btn continue" onclick="continueHeldCart('${h.id}')">Continue</button>
-            <button class="onhold-card-btn delete" onclick="deleteHeldCart('${h.id}')">Delete</button>
-          </div>`).join('')}
+        <div class="onhold-bar" onclick="toggleOnHold()">
+          <span class="onhold-bar-title">📌 On Hold (${held.length})</span>
+          <span class="onhold-chevron">${onHoldExpanded ? '▴' : '▾'}</span>
+        </div>
+        <div class="onhold-list${onHoldExpanded ? ' open' : ''}">
+          ${held.map(h => `
+            <div class="onhold-card">
+              <div class="onhold-card-info">
+                <div class="onhold-card-name">${escStr(h.name)}</div>
+                <div class="onhold-card-meta">${h.count} item${h.count === 1 ? '' : 's'} · $${(h.total || 0).toFixed(2)}</div>
+              </div>
+              <button class="onhold-card-btn continue" onclick="continueHeldCart('${h.id}')">Continue</button>
+              <button class="onhold-card-btn delete" onclick="deleteHeldCart('${h.id}')">Delete</button>
+            </div>`).join('')}
+        </div>
       `;
       box.classList.add('show');
     }
