@@ -224,7 +224,7 @@
     .cart-panel {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 400;
       background: var(--card-bg); border-radius: 20px 20px 0 0;
-      box-shadow: var(--shadow-lg); max-height: 75vh;
+      box-shadow: var(--shadow-lg); max-height: 100vh;
       display: flex; flex-direction: column;
       transform: translateY(100%);
       transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
@@ -272,27 +272,27 @@
       text-align: center; font-size: 13px; font-weight: 600;
     }
     .cart-item-remove { background: none; border: none; color: var(--danger); font-size: 12px; cursor: pointer; padding: 4px 8px; font-weight: 500; }
-    .cart-panel-footer { padding: 12px 20px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
-    .cart-subtotal { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 16px; }
+    .cart-panel-footer { padding: 8px 16px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--border); flex-shrink: 0; }
+    .cart-subtotal { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; }
     .cart-subtotal-label { color: var(--text-light); }
     .cart-subtotal-value { font-weight: 700; color: var(--primary); }
     .cart-checkout-btn {
-      width: 100%; padding: 14px; background: var(--accent); color: #fff;
-      border: none; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer;
+      width: 100%; padding: 12px; background: var(--accent); color: #fff;
+      border: none; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
     .cart-checkout-btn:hover { filter: brightness(1.08); }
     .cart-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
     .cart-hold-btn {
-      width: 100%; padding: 12px; background: #fff; color: var(--accent);
-      border: 1.5px solid var(--accent); border-radius: 25px; font-size: 14px; font-weight: 600; cursor: pointer;
-      margin-bottom: 10px;
+      width: 100%; padding: 10px; background: #fff; color: var(--accent);
+      border: 1.5px solid var(--accent); border-radius: 25px; font-size: 13px; font-weight: 600; cursor: pointer;
+      margin-bottom: 8px;
     }
     .cart-hold-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; background: #fff; }
     .cart-onhold { display: none; padding: 8px 16px; border-bottom: 1px solid var(--border); background: #f7f4ee; flex-shrink: 0; }
     .cart-onhold.show { display: block; }
-    .onhold-bar { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; cursor: pointer; }
-    .onhold-bar-title { font-size: 13px; font-weight: 700; color: var(--text); }
-    .onhold-chevron { font-size: 14px; color: var(--text-light); }
+    .onhold-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; cursor: pointer; }
+    .onhold-bar-title { font-size: 14px; font-weight: 700; color: var(--text); }
+    .onhold-chevron { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
     .onhold-list { display: none; max-height: 200px; overflow-y: auto; margin-top: 4px; }
     .onhold-list.open { display: block; }
     .onhold-card { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 8px; background: #fff; border: 1px solid var(--border); border-radius: 12px; }
