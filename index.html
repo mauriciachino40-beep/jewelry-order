@@ -282,6 +282,23 @@
     }
     .cart-checkout-btn:hover { filter: brightness(1.08); }
     .cart-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
+    .cart-hold-btn {
+      width: 100%; padding: 12px; background: #fff; color: var(--accent);
+      border: 1.5px solid var(--accent); border-radius: 25px; font-size: 14px; font-weight: 600; cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .cart-hold-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; background: #fff; }
+    .cart-onhold { display: none; padding: 10px 16px; border-bottom: 1px solid var(--border); background: #f7f4ee; max-height: 220px; overflow-y: auto; flex-shrink: 0; }
+    .cart-onhold.show { display: block; }
+    .cart-onhold-title { font-size: 12px; font-weight: 700; color: var(--text-light); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .onhold-card { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 8px; background: #fff; border: 1px solid var(--border); border-radius: 12px; }
+    .onhold-card:last-child { margin-bottom: 0; }
+    .onhold-card-info { flex: 1; min-width: 0; }
+    .onhold-card-name { font-weight: 700; font-size: 14px; }
+    .onhold-card-meta { font-size: 12px; color: var(--text-light); }
+    .onhold-card-btn { border: none; border-radius: 18px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .onhold-card-btn.continue { background: var(--accent); color: #fff; }
+    .onhold-card-btn.delete { background: #fff; color: var(--danger); border: 1px solid var(--border); }
 
     /* ========== Orders Panel ========== */
     .orders-panel { position: fixed; bottom: 0; left: 0; right: 0; top: 0; z-index: 400; background: var(--card-bg); display: flex; flex-direction: column; transform: translateY(100%); transition: transform 0.3s ease; }
@@ -720,11 +737,13 @@
       </div>
     </div>
     <div class="cart-items" id="cartItems"></div>
+    <div class="cart-onhold" id="cartOnHold"></div>
     <div class="cart-panel-footer">
       <div class="cart-subtotal">
         <span class="cart-subtotal-label">Subtotal</span>
         <span class="cart-subtotal-value" id="cartSubtotal">$0.00</span>
       </div>
+      <button class="cart-hold-btn" id="cartHoldBtn" disabled onclick="openHoldModal()">📌 Hold (Save for Later)</button>
       <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="openCheckout()">Proceed to Checkout</button>
     </div>
   </div>
@@ -769,6 +788,21 @@
         <div class="cancel-actions">
           <button class="cancel-back-btn" onclick="closeCancelModal()">← Back</button>
           <button class="cancel-confirm-btn" id="cancelConfirmBtn" disabled onclick="confirmCancelOrder()">Confirm Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== HOLD CART MODAL ==================== -->
+  <div class="cancel-modal" id="holdModal">
+    <div class="cancel-modal-content">
+      <div class="cancel-modal-body">
+        <div class="cancel-modal-title">📌 Hold Cart</div>
+        <div class="cancel-modal-subtitle">Enter the customer name for this cart:</div>
+        <input class="cancel-other-input show" id="holdNameInput" placeholder="e.g. Mary" autocomplete="off">
+        <div class="cancel-actions">
+          <button class="cancel-back-btn" onclick="closeHoldModal()">← Back</button>
+          <button class="cancel-confirm-btn" style="background:var(--accent);color:#fff" onclick="confirmHold()">📌 Hold</button>
         </div>
       </div>
     </div>
@@ -1405,6 +1439,8 @@
       const total = getCartTotal();
       document.getElementById('cartSubtotal').textContent = `$${total.toFixed(2)}`;
       document.getElementById('cartCheckoutBtn').disabled = cart.length === 0;
+      document.getElementById('cartHoldBtn').disabled = cart.length === 0;
+      renderOnHold();
 
       if (cart.length === 0) {
         container.innerHTML = `<div class="cart-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><p>Your cart is empty</p></div>`;
@@ -1439,6 +1475,76 @@
             </div>
           </div>`;
       }).join('');
+    }
+
+    // ============================================================
+    // HOLD CART — 挂起当前购物车，按顾客名暂存，可同时开多个顾客的单
+    // ============================================================
+    function getHeldCarts() {
+      try { return JSON.parse(localStorage.getItem(getStorageKey('held_carts'))) || []; } catch(e) { return []; }
+    }
+    function saveHeldCarts(list) { localStorage.setItem(getStorageKey('held_carts'), JSON.stringify(list)); }
+
+    function openHoldModal() {
+      if (cart.length === 0) return;
+      document.getElementById('holdNameInput').value = '';
+      document.getElementById('holdModal').classList.add('show');
+      setTimeout(() => document.getElementById('holdNameInput').focus(), 60);
+    }
+    function closeHoldModal() {
+      document.getElementById('holdModal').classList.remove('show');
+    }
+    function confirmHold() {
+      const name = document.getElementById('holdNameInput').value.trim();
+      if (!name) { showToast('⚠️ Please enter a customer name'); return; }
+      const held = getHeldCarts();
+      held.unshift({
+        id: 'H' + Date.now(),
+        name: name,
+        items: cart.map(i => ({ ...i })),
+        count: getCartCount(),
+        total: getCartTotal()
+      });
+      saveHeldCarts(held);
+      cart = []; saveCart(); updateCartUI();
+      closeHoldModal();
+      showToast(`📌 Held "${name}" — ${held[0].count} item(s)`);
+    }
+    function continueHeldCart(id) {
+      const held = getHeldCarts();
+      const target = held.find(h => h.id === id);
+      if (!target) return;
+      cart = cart.concat(target.items.map(i => ({ ...i })));
+      saveHeldCarts(held.filter(h => h.id !== id));
+      saveCart(); updateCartUI();
+      showToast(`🛒 Loaded "${target.name}" into cart`);
+    }
+    function deleteHeldCart(id) {
+      let held = getHeldCarts();
+      const target = held.find(h => h.id === id);
+      held = held.filter(h => h.id !== id);
+      saveHeldCarts(held);
+      renderOnHold();
+      if (target) showToast(`🗑️ Deleted "${target.name}"`);
+    }
+    function renderOnHold() {
+      const box = document.getElementById('cartOnHold');
+      if (!box) return;
+      const held = getHeldCarts();
+      if (held.length === 0) { box.classList.remove('show'); box.innerHTML = ''; return; }
+      box.innerHTML = `
+        <div class="cart-onhold-title">📌 On Hold (${held.length})</div>
+        ${held.map(h => `
+          <div class="onhold-card">
+            <div class="onhold-card-info">
+              <div class="onhold-card-name">${escStr(h.name)}</div>
+              <div class="onhold-card-meta">${h.count} item${h.count === 1 ? '' : 's'} · $${(h.total || 0).toFixed(2)}</div>
+            </div>
+            <button class="onhold-card-btn continue" onclick="continueHeldCart('${h.id}')">Continue</button>
+            <button class="onhold-card-btn delete" onclick="deleteHeldCart('${h.id}')">Delete</button>
+          </div>`).join('')}
+      `;
+      box.classList.add('show');
     }
 
     // ============================================================
