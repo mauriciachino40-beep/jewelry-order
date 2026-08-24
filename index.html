@@ -725,7 +725,7 @@
       <button class="admin-filter-tab active" data-filter="All" onclick="filterAdminOrders('All')">All</button>
       <button class="admin-filter-tab" data-filter="New" onclick="filterAdminOrders('New')">🆕 New</button>
       <button class="admin-filter-tab" data-filter="Processing" onclick="filterAdminOrders('Processing')">⏳ Processing</button>
-      <button class="admin-filter-tab" data-filter="Partial" onclick="filterAdminOrders('Partial')">🟠 部分发货</button>
+      <button class="admin-filter-tab" data-filter="Partial" onclick="filterAdminOrders('Partial')">🟠 Partial</button>
       <button class="admin-filter-tab" data-filter="Shipped" onclick="filterAdminOrders('Shipped')">📦 Shipped</button>
       <button class="admin-filter-tab" data-filter="Cancelled" onclick="filterAdminOrders('Cancelled')">❌ Cancelled</button>
     </div>
@@ -2058,7 +2058,7 @@
         if (key === 'All') tab.innerHTML = 'All <span class="admin-filter-count">' + orders.length + '</span>';
         else if (key === 'New') tab.innerHTML = '🆕 New <span class="admin-filter-count">' + (counts['New'] || 0) + '</span>';
         else if (key === 'Processing') tab.innerHTML = '⏳ Processing <span class="admin-filter-count">' + (counts['Processing'] || 0) + '</span>';
-        else if (key === 'Partial') tab.innerHTML = '🟠 部分发货 <span class="admin-filter-count">' + (counts['Partial'] || 0) + '</span>';
+        else if (key === 'Partial') tab.innerHTML = '🟠 Partial <span class="admin-filter-count">' + (counts['Partial'] || 0) + '</span>';
         else if (key === 'Shipped') tab.innerHTML = '📦 Shipped <span class="admin-filter-count">' + (counts['Shipped'] || 0) + '</span>';
         else if (key === 'Cancelled') tab.innerHTML = '❌ Cancelled <span class="admin-filter-count">' + (counts['Cancelled'] || 0) + '</span>';
         tab.classList.toggle('active', key === (filterStatus || 'All'));
@@ -2067,7 +2067,7 @@
 
       var body = document.getElementById('adminBody');
       if (filtered.length === 0) {
-        var emptyLabel = filterStatus === 'Partial' ? '部分发货' : filterStatus;
+        var emptyLabel = filterStatus === 'Partial' ? 'Partial' : filterStatus;
         body.innerHTML = '<div class="admin-loading">No orders in "' + emptyLabel + '".</div>';
         return;
       }
@@ -2082,7 +2082,7 @@
         if (st.total > 0 && st.shipped > 0) {
           var partial = st.shipped < st.total;
           var cls = partial ? 'ship-badge-partial' : 'ship-badge-done';
-          var txt = partial ? ('📦 已发 ' + st.shipped + '/' + st.total + ' · 剩' + (st.total - st.shipped)) : ('📦 已发 ' + st.shipped + '/' + st.total);
+          var txt = partial ? ('📦 ' + st.shipped + '/' + st.total + ' shipped · ' + (st.total - st.shipped) + ' left') : ('📦 ' + st.shipped + '/' + st.total + ' shipped');
           shipBadgeHTML = '<span class="ship-badge ' + cls + '">' + txt + '</span>';
         }
         return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
