@@ -224,7 +224,9 @@
     .cart-panel {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 400;
       background: var(--card-bg); border-radius: 20px 20px 0 0;
-      box-shadow: var(--shadow-lg); max-height: 100vh;
+      box-shadow: var(--shadow-lg);
+      height: 100vh;
+      height: 100dvh;
       display: flex; flex-direction: column;
       transform: translateY(100%);
       transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
@@ -276,16 +278,16 @@
     .cart-subtotal { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 14px; }
     .cart-subtotal-label { color: var(--text-light); }
     .cart-subtotal-value { font-weight: 700; color: var(--primary); }
+    .cart-actions-row { display: flex; gap: 8px; }
     .cart-checkout-btn {
-      width: 100%; padding: 12px; background: var(--accent); color: #fff;
+      flex: 1.5; padding: 12px; background: var(--accent); color: #fff;
       border: none; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
     .cart-checkout-btn:hover { filter: brightness(1.08); }
     .cart-checkout-btn:disabled { background: #ccc; cursor: not-allowed; }
     .cart-hold-btn {
-      width: 100%; padding: 10px; background: #fff; color: var(--accent);
-      border: 1.5px solid var(--accent); border-radius: 25px; font-size: 13px; font-weight: 600; cursor: pointer;
-      margin-bottom: 8px;
+      flex: 1; padding: 12px; background: #fff; color: var(--accent);
+      border: 1.5px solid var(--accent); border-radius: 25px; font-size: 14px; font-weight: 600; cursor: pointer;
     }
     .cart-hold-btn:disabled { border-color: #ccc; color: #ccc; cursor: not-allowed; background: #fff; }
     .cart-onhold { display: none; padding: 8px 16px; border-bottom: 1px solid var(--border); background: #f7f4ee; flex-shrink: 0; }
@@ -747,8 +749,10 @@
         <span class="cart-subtotal-label">Subtotal</span>
         <span class="cart-subtotal-value" id="cartSubtotal">$0.00</span>
       </div>
-      <button class="cart-hold-btn" id="cartHoldBtn" disabled onclick="openHoldModal()">📌 Hold (Save for Later)</button>
-      <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="openCheckout()">Proceed to Checkout</button>
+      <div class="cart-actions-row">
+        <button class="cart-hold-btn" id="cartHoldBtn" disabled onclick="openHoldModal()">📌 Hold</button>
+        <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="openCheckout()">Proceed to Checkout</button>
+      </div>
     </div>
   </div>
 
