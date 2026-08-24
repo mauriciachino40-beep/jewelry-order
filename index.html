@@ -524,6 +524,9 @@
     .status-Processing { background: #fff3e0; color: #e65100; }
     .status-Shipped { background: #e8f5e9; color: #2e7d32; }
     .status-Cancelled { background: #fce4ec; color: #c62828; }
+    .ship-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+    .ship-badge-partial { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+    .ship-badge-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
     .admin-status-select {
       font-size: 12px; padding: 4px 8px; border-radius: 12px;
       border: 1px solid var(--border); background: #fff; cursor: pointer;
@@ -719,11 +722,12 @@
       <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
     </div>
     <div class="admin-filter-tabs" id="adminFilterTabs" style="display:none;">
-      <button class="admin-filter-tab active" onclick="filterAdminOrders('All')">All</button>
-      <button class="admin-filter-tab" onclick="filterAdminOrders('New')">🆕 New</button>
-      <button class="admin-filter-tab" onclick="filterAdminOrders('Processing')">⏳ Processing</button>
-      <button class="admin-filter-tab" onclick="filterAdminOrders('Shipped')">📦 Shipped</button>
-      <button class="admin-filter-tab" onclick="filterAdminOrders('Cancelled')">❌ Cancelled</button>
+      <button class="admin-filter-tab active" data-filter="All" onclick="filterAdminOrders('All')">All</button>
+      <button class="admin-filter-tab" data-filter="New" onclick="filterAdminOrders('New')">🆕 New</button>
+      <button class="admin-filter-tab" data-filter="Processing" onclick="filterAdminOrders('Processing')">⏳ Processing</button>
+      <button class="admin-filter-tab" data-filter="Partial" onclick="filterAdminOrders('Partial')">🟠 部分发货</button>
+      <button class="admin-filter-tab" data-filter="Shipped" onclick="filterAdminOrders('Shipped')">📦 Shipped</button>
+      <button class="admin-filter-tab" data-filter="Cancelled" onclick="filterAdminOrders('Cancelled')">❌ Cancelled</button>
     </div>
     <div class="admin-body" id="adminBody">
       <div class="admin-loading">Loading orders...</div>
@@ -2028,28 +2032,43 @@
 
     function renderAdminOrders(filterStatus) {
       var orders = window._adminOrders;
-      var filtered = filterStatus && filterStatus !== 'All'
-        ? orders.filter(function(o) { return (o['Status'] || 'New') === filterStatus; })
-        : orders;
+      var filtered;
+      if (filterStatus === 'Partial') {
+        filtered = orders.filter(function(o) {
+          var st = getShipmentStats(o);
+          return st.total > 0 && st.shipped > 0 && st.shipped < st.total;
+        });
+      } else if (filterStatus && filterStatus !== 'All') {
+        filtered = orders.filter(function(o) { return (o['Status'] || 'New') === filterStatus; });
+      } else {
+        filtered = orders;
+      }
 
       // 更新 filter tabs 徽标
       var tabs = document.querySelectorAll('#adminFilterTabs .admin-filter-tab');
-      var counts = { New: 0, Processing: 0, Shipped: 0, Cancelled: 0 };
-      orders.forEach(function(o) { var s = o['Status'] || 'New'; counts[s] = (counts[s] || 0) + 1; });
+      var counts = { New: 0, Processing: 0, Shipped: 0, Cancelled: 0, Partial: 0 };
+      orders.forEach(function(o) {
+        var s = o['Status'] || 'New';
+        counts[s] = (counts[s] || 0) + 1;
+        var st = getShipmentStats(o);
+        if (st.total > 0 && st.shipped > 0 && st.shipped < st.total) counts['Partial']++;
+      });
       tabs.forEach(function(tab) {
-        var raw = tab.textContent.replace(/[🆕⏳📦❌\d\s]/g, '').trim();
-        if (raw === 'All') tab.innerHTML = 'All <span class="admin-filter-count">' + orders.length + '</span>';
-        else if (raw === 'New') tab.innerHTML = '🆕 New <span class="admin-filter-count">' + (counts['New'] || 0) + '</span>';
-        else if (raw === 'Processing') tab.innerHTML = '⏳ Processing <span class="admin-filter-count">' + (counts['Processing'] || 0) + '</span>';
-        else if (raw === 'Shipped') tab.innerHTML = '📦 Shipped <span class="admin-filter-count">' + (counts['Shipped'] || 0) + '</span>';
-        else if (raw === 'Cancelled') tab.innerHTML = '❌ Cancelled <span class="admin-filter-count">' + (counts['Cancelled'] || 0) + '</span>';
-        tab.classList.toggle('active', raw === (filterStatus || 'All'));
+        var key = tab.getAttribute('data-filter') || 'All';
+        if (key === 'All') tab.innerHTML = 'All <span class="admin-filter-count">' + orders.length + '</span>';
+        else if (key === 'New') tab.innerHTML = '🆕 New <span class="admin-filter-count">' + (counts['New'] || 0) + '</span>';
+        else if (key === 'Processing') tab.innerHTML = '⏳ Processing <span class="admin-filter-count">' + (counts['Processing'] || 0) + '</span>';
+        else if (key === 'Partial') tab.innerHTML = '🟠 部分发货 <span class="admin-filter-count">' + (counts['Partial'] || 0) + '</span>';
+        else if (key === 'Shipped') tab.innerHTML = '📦 Shipped <span class="admin-filter-count">' + (counts['Shipped'] || 0) + '</span>';
+        else if (key === 'Cancelled') tab.innerHTML = '❌ Cancelled <span class="admin-filter-count">' + (counts['Cancelled'] || 0) + '</span>';
+        tab.classList.toggle('active', key === (filterStatus || 'All'));
       });
       document.getElementById('adminFilterTabs').style.display = 'flex';
 
       var body = document.getElementById('adminBody');
       if (filtered.length === 0) {
-        body.innerHTML = '<div class="admin-loading">No orders in "' + filterStatus + '".</div>';
+        var emptyLabel = filterStatus === 'Partial' ? '部分发货' : filterStatus;
+        body.innerHTML = '<div class="admin-loading">No orders in "' + emptyLabel + '".</div>';
         return;
       }
 
@@ -2058,10 +2077,21 @@
         var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
         var itemsHTML = buildAdminShipItemsHTML(o, i);
         var adminNote = o['Admin Note'] || '';
+        var st = getShipmentStats(o);
+        var shipBadgeHTML = '';
+        if (st.total > 0 && st.shipped > 0) {
+          var partial = st.shipped < st.total;
+          var cls = partial ? 'ship-badge-partial' : 'ship-badge-done';
+          var txt = partial ? ('📦 已发 ' + st.shipped + '/' + st.total + ' · 剩' + (st.total - st.shipped)) : ('📦 已发 ' + st.shipped + '/' + st.total);
+          shipBadgeHTML = '<span class="ship-badge ' + cls + '">' + txt + '</span>';
+        }
         return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
           '<div class="admin-order-header">' +
             '<span class="admin-order-id">📋 ' + o['Order ID'] + '</span>' +
-            '<span class="status-badge ' + statusClass + '">' + (o['Status'] || 'New') + '</span>' +
+            '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">' +
+              '<span class="status-badge ' + statusClass + '">' + (o['Status'] || 'New') + '</span>' +
+              shipBadgeHTML +
+            '</div>' +
           '</div>' +
           '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
           '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
@@ -2150,6 +2180,28 @@
 
     function escStr(s) {
       return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function getShipmentStats(o) {
+      var items = [];
+      try {
+        var raw = o['Items Data'];
+        items = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+      } catch(e) { items = []; }
+      if (!Array.isArray(items)) items = [];
+
+      var shipments = [];
+      try {
+        var sRaw = o['Shipments'];
+        shipments = sRaw ? JSON.parse(sRaw) : [];
+      } catch(e) { shipments = []; }
+      if (!Array.isArray(shipments)) shipments = [];
+
+      var shippedSet = {};
+      shipments.forEach(function(s) { (s.items || []).forEach(function(x) { shippedSet[x] = true; }); });
+      var shipped = 0;
+      items.forEach(function(it, n) { if (shippedSet[n]) shipped++; });
+      return { shipped: shipped, total: items.length };
     }
 
     function buildAdminShipItemsHTML(o, i) {
