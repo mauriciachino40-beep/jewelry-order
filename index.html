@@ -501,7 +501,8 @@
       padding: 16px 20px; border-bottom: 1px solid var(--border);
       background: var(--card-bg); flex-shrink: 0;
     }
-    .admin-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .admin-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex: 1; }
+    .admin-header-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .admin-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
     .admin-loading { text-align: center; padding: 40px; color: var(--text-light); }
     .admin-order-card {
@@ -534,6 +535,10 @@
     .admin-refresh-btn {
       background: var(--bg); border: 1.5px solid var(--border); border-radius: 20px;
       padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+    .admin-summary-btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 20px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
     }
     .admin-delete-btn {
       background: #fff; border: 1.5px solid var(--danger); color: var(--danger);
@@ -611,6 +616,30 @@
       border: none; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
     .pw-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+
+    /* ========== Summary (对账) Modal ========== */
+    .summary-modal { display: none; position: fixed; inset: 0; z-index: 750; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; }
+    .summary-modal.show { display: flex; }
+    .summary-modal-content { background: var(--card-bg); border-radius: 20px 20px 0 0; width: 100%; max-width: 480px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow-lg); }
+    .summary-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .summary-modal-header h3 { font-size: 17px; font-weight: 700; }
+    .summary-modal-body { padding: 16px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .summary-stat { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px dashed var(--border); font-size: 14px; }
+    .summary-stat-label { color: var(--text); }
+    .summary-stat-value { font-weight: 700; }
+    .summary-balance { margin-top: 14px; padding: 14px; border-radius: 12px; font-size: 15px; font-weight: 700; text-align: center; }
+    .summary-balance.owes { background: #fff3e0; color: #e65100; }
+    .summary-balance.paid { background: #e8f5e9; color: #2e7d32; }
+    .summary-balance.even { background: #f0f0f0; color: var(--text); }
+    .payment-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .payment-row-date { color: var(--text-light); font-size: 12px; }
+    .payment-row-amount { font-weight: 700; margin-left: auto; }
+    .payment-delete-btn { background: none; border: none; color: var(--danger); cursor: pointer; font-size: 14px; padding: 2px 6px; }
+    .payment-add-row { display: flex; gap: 6px; margin-top: 10px; }
+    .payment-add-row input { padding: 8px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; box-sizing: border-box; }
+    .payment-add-date { width: 132px; flex-shrink: 0; }
+    .payment-add-amount { flex: 1; min-width: 0; }
+    .payment-add-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
 
     /* ========== User Name Modal ========== */
     .user-modal {
@@ -719,7 +748,10 @@
     <div class="admin-header">
       <button class="checkout-back-btn" onclick="closeAdmin()">←</button>
       <h2>📊 All Orders</h2>
-      <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
+      <div class="admin-header-actions">
+        <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
+        <button class="admin-summary-btn" onclick="openSummary()">💰 Summary</button>
+      </div>
     </div>
     <div class="admin-filter-tabs" id="adminFilterTabs" style="display:none;">
       <button class="admin-filter-tab active" data-filter="All" onclick="filterAdminOrders('All')">All</button>
@@ -817,6 +849,18 @@
           <button class="cancel-confirm-btn" style="background:var(--accent);color:#fff" onclick="confirmHold()">📌 Hold</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== SUMMARY (对账) MODAL ==================== -->
+  <div class="summary-modal" id="summaryModal">
+    <div class="summary-modal-content">
+      <div class="summary-modal-header">
+        <button class="checkout-back-btn" onclick="closeSummary()">←</button>
+        <h3>💰 对账 Summary</h3>
+        <span style="width:34px;"></span>
+      </div>
+      <div class="summary-modal-body" id="summaryBody"></div>
     </div>
   </div>
 
@@ -2028,6 +2072,118 @@
         .catch(function(e) {
           body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Network error: ' + e.message + '</div>';
         });
+    }
+
+    // ========== 对账 Summary + Lisa 转账记录 ==========
+    var PAYMENTS_KEY = 'jewelry_lisa_payments';
+    function getPayments() {
+      try { var v = JSON.parse(localStorage.getItem(PAYMENTS_KEY)); return Array.isArray(v) ? v : []; }
+      catch(e) { return []; }
+    }
+    function savePayments(list) { try { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(list)); } catch(e) {} }
+    function todayStr() {
+      var d = new Date();
+      var m = ('0' + (d.getMonth() + 1)).slice(-2);
+      var day = ('0' + d.getDate()).slice(-2);
+      return d.getFullYear() + '-' + m + '-' + day;
+    }
+    function openSummary() {
+      renderSummary();
+      document.getElementById('summaryModal').classList.add('show');
+    }
+    function closeSummary() {
+      document.getElementById('summaryModal').classList.remove('show');
+    }
+    function addPayment() {
+      var amount = parseFloat(document.getElementById('payAmount').value);
+      if (!amount || amount <= 0) { showToast('⚠️ 先填金额', 2000); return; }
+      var date = document.getElementById('payDate').value || todayStr();
+      var list = getPayments();
+      list.push({ id: 'P' + Date.now(), date: date, amount: amount });
+      savePayments(list);
+      renderSummary();
+      showToast('✅ 已记录转账', 2000);
+    }
+    function deletePayment(id) {
+      if (!confirm('删除这条转账记录？')) return;
+      savePayments(getPayments().filter(function(p) { return p.id !== id; }));
+      renderSummary();
+    }
+    function copyPayments() {
+      var list = getPayments();
+      if (list.length === 0) { showToast('还没有记录', 1500); return; }
+      var txt = list.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; })
+        .map(function(p) { return p.date + '  $' + (Number(p.amount) || 0).toFixed(2); }).join('\n');
+      navigator.clipboard.writeText(txt).then(function() { showToast('✅ 已复制，可粘贴备份', 1500); })
+        .catch(function() { showToast('⚠️ 复制失败', 2000); });
+    }
+    function renderSummary() {
+      var html = '';
+      var orders = window._adminOrders;
+
+      if (!orders) {
+        html += '<div style="color:var(--text-light);padding:12px 0;">⚠️ 订单还没加载，点右上角 Refresh 后再看对账。</div>';
+      } else {
+        var fullyCount = 0, fullySum = 0;
+        var partialCount = 0, partialShippedSum = 0, partialRemainingSum = 0;
+        orders.forEach(function(o) {
+          var items = []; try { var r = o['Items Data']; items = typeof r === 'string' ? JSON.parse(r) : (r || []); } catch(e) { items = []; }
+          if (!Array.isArray(items)) items = [];
+          var shipments = []; try { var s = o['Shipments']; shipments = s ? JSON.parse(s) : []; } catch(e) { shipments = []; }
+          if (!Array.isArray(shipments)) shipments = [];
+          var sidx = {}; shipments.forEach(function(sh) { (sh.items || []).forEach(function(x) { sidx[x] = true; }); });
+          var shippedN = 0, shippedVal = 0;
+          items.forEach(function(it, n) { if (sidx[n]) { shippedN++; shippedVal += Number(it.subtotal) || 0; } });
+          var status = o['Status'] || 'New';
+          var total = Number(o['Total']) || 0;
+          if (status === 'Shipped' || (shippedN > 0 && shippedN === items.length)) {
+            fullyCount++; fullySum += total;
+          } else if (shippedN > 0) {
+            partialCount++; partialShippedSum += shippedVal; partialRemainingSum += (total - shippedVal);
+          }
+        });
+        var shippedTotal = fullySum + partialShippedSum;
+
+        html += '<div class="summary-stat"><span class="summary-stat-label">✅ 全部发货（' + fullyCount + ' 单）</span><span class="summary-stat-value">$' + fullySum.toFixed(2) + '</span></div>';
+        html += '<div class="summary-stat"><span class="summary-stat-label">🟠 部分发货（' + partialCount + ' 单 · 已发部分）</span><span class="summary-stat-value">$' + partialShippedSum.toFixed(2) + '</span></div>';
+        if (partialCount > 0) {
+          html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ 其中还没发</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
+        }
+        html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 已发货总额</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
+
+        var payments = getPayments();
+        var paidTotal = payments.reduce(function(a, p) { return a + (Number(p.amount) || 0); }, 0);
+        html += '<div class="summary-stat"><span class="summary-stat-label">💵 Lisa 已转账（' + payments.length + ' 笔）</span><span class="summary-stat-value">$' + paidTotal.toFixed(2) + '</span></div>';
+
+        var bal = Math.round((shippedTotal - paidTotal) * 100) / 100;
+        var balCls, balTxt;
+        if (bal > 0.005) { balCls = 'owes'; balTxt = 'Lisa 还欠你 $' + bal.toFixed(2); }
+        else if (bal < -0.005) { balCls = 'paid'; balTxt = '你多收了 $' + (-bal).toFixed(2) + '（Lisa 多打了）'; }
+        else { balCls = 'even'; balTxt = '已结清 ✓'; }
+        html += '<div class="summary-balance ' + balCls + '">' + balTxt + '</div>';
+
+        // 转账记录列表
+        html += '<div style="margin-top:18px;font-weight:700;font-size:14px;">💵 Lisa 转账记录</div>';
+        if (payments.length === 0) {
+          html += '<div style="color:var(--text-light);font-size:13px;padding:8px 0;">还没有记录，在下面添加 Lisa 每次转的钱。</div>';
+        } else {
+          payments.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; }).forEach(function(p) {
+            html += '<div class="payment-row">' +
+              '<span class="payment-row-date">' + escStr(p.date || '') + '</span>' +
+              '<span class="payment-row-amount">$' + (Number(p.amount) || 0).toFixed(2) + '</span>' +
+              '<button class="payment-delete-btn" onclick="deletePayment(\'' + p.id + '\')">✕</button>' +
+            '</div>';
+          });
+        }
+        html += '<div class="payment-add-row">' +
+          '<input type="date" class="payment-add-date" id="payDate" value="' + todayStr() + '">' +
+          '<input type="number" class="payment-add-amount" id="payAmount" placeholder="金额 $" min="0" step="0.01">' +
+          '<button class="payment-add-btn" onclick="addPayment()">Add</button>' +
+        '</div>';
+        html += '<div style="margin-top:10px;"><button class="admin-refresh-btn" onclick="copyPayments()">📋 Copy 备份记录</button></div>';
+      }
+
+      document.getElementById('summaryBody').innerHTML = html;
     }
 
     function renderAdminOrders(filterStatus) {
