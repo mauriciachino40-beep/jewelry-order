@@ -2075,12 +2075,6 @@
     }
 
     // ========== 对账 Summary + Lisa 转账记录 ==========
-    var PAYMENTS_KEY = 'jewelry_lisa_payments';
-    function getPayments() {
-      try { var v = JSON.parse(localStorage.getItem(PAYMENTS_KEY)); return Array.isArray(v) ? v : []; }
-      catch(e) { return []; }
-    }
-    function savePayments(list) { try { localStorage.setItem(PAYMENTS_KEY, JSON.stringify(list)); } catch(e) {} }
     function todayStr() {
       var d = new Date();
       var m = ('0' + (d.getMonth() + 1)).slice(-2);
@@ -2088,36 +2082,52 @@
       return d.getFullYear() + '-' + m + '-' + day;
     }
     function openSummary() {
-      renderSummary();
       document.getElementById('summaryModal').classList.add('show');
+      loadPaymentsAndRender();
     }
     function closeSummary() {
       document.getElementById('summaryModal').classList.remove('show');
+    }
+    function loadPaymentsAndRender() {
+      var body = document.getElementById('summaryBody');
+      body.innerHTML = '<div class="admin-loading">加载转账记录…</div>';
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_list')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          var payments = (data && Array.isArray(data.payments)) ? data.payments : null;
+          renderSummary(payments);
+        })
+        .catch(function() { renderSummary(null); });
     }
     function addPayment() {
       var amount = parseFloat(document.getElementById('payAmount').value);
       if (!amount || amount <= 0) { showToast('⚠️ 先填金额', 2000); return; }
       var date = document.getElementById('payDate').value || todayStr();
-      var list = getPayments();
-      list.push({ id: 'P' + Date.now(), date: date, amount: amount });
-      savePayments(list);
-      renderSummary();
-      showToast('✅ 已记录转账', 2000);
+      var url = ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_add&date=' + encodeURIComponent(date) + '&amount=' + amount;
+      fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.success) { showToast('✅ 已记录转账', 2000); loadPaymentsAndRender(); }
+        else { showToast('❌ ' + (data.error || '保存失败'), 3000); }
+      }).catch(function(e) { showToast('❌ ' + e.message, 3000); });
     }
-    function deletePayment(id) {
+    function deletePayment(row) {
       if (!confirm('删除这条转账记录？')) return;
-      savePayments(getPayments().filter(function(p) { return p.id !== id; }));
-      renderSummary();
+      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_delete&row=' + row)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.success) { showToast('↩️ 已删除', 1500); loadPaymentsAndRender(); }
+          else { showToast('❌ ' + (data.error || '删除失败'), 3000); }
+        }).catch(function(e) { showToast('❌ ' + e.message, 3000); });
     }
     function copyPayments() {
-      var list = getPayments();
+      var list = window._payments || [];
       if (list.length === 0) { showToast('还没有记录', 1500); return; }
       var txt = list.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; })
         .map(function(p) { return p.date + '  $' + (Number(p.amount) || 0).toFixed(2); }).join('\n');
       navigator.clipboard.writeText(txt).then(function() { showToast('✅ 已复制，可粘贴备份', 1500); })
         .catch(function() { showToast('⚠️ 复制失败', 2000); });
     }
-    function renderSummary() {
+    function renderSummary(payments) {
+      window._payments = payments || [];
       var html = '';
       var orders = window._adminOrders;
 
@@ -2151,9 +2161,8 @@
         }
         html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 已发货总额</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
 
-        var payments = getPayments();
-        var paidTotal = payments.reduce(function(a, p) { return a + (Number(p.amount) || 0); }, 0);
-        html += '<div class="summary-stat"><span class="summary-stat-label">💵 Lisa 已转账（' + payments.length + ' 笔）</span><span class="summary-stat-value">$' + paidTotal.toFixed(2) + '</span></div>';
+        var paidTotal = window._payments.reduce(function(a, p) { return a + (Number(p.amount) || 0); }, 0);
+        html += '<div class="summary-stat"><span class="summary-stat-label">💵 Lisa 已转账（' + window._payments.length + ' 笔）</span><span class="summary-stat-value">$' + paidTotal.toFixed(2) + '</span></div>';
 
         var bal = Math.round((shippedTotal - paidTotal) * 100) / 100;
         var balCls, balTxt;
@@ -2164,14 +2173,16 @@
 
         // 转账记录列表
         html += '<div style="margin-top:18px;font-weight:700;font-size:14px;">💵 Lisa 转账记录</div>';
-        if (payments.length === 0) {
+        if (payments === null) {
+          html += '<div style="color:var(--danger);font-size:13px;padding:8px 0;">⚠️ 转账记录加载失败（后台脚本还没升级？）。订单对账不受影响。</div>';
+        } else if (window._payments.length === 0) {
           html += '<div style="color:var(--text-light);font-size:13px;padding:8px 0;">还没有记录，在下面添加 Lisa 每次转的钱。</div>';
         } else {
-          payments.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; }).forEach(function(p) {
+          window._payments.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; }).forEach(function(p) {
             html += '<div class="payment-row">' +
               '<span class="payment-row-date">' + escStr(p.date || '') + '</span>' +
               '<span class="payment-row-amount">$' + (Number(p.amount) || 0).toFixed(2) + '</span>' +
-              '<button class="payment-delete-btn" onclick="deletePayment(\'' + p.id + '\')">✕</button>' +
+              '<button class="payment-delete-btn" onclick="deletePayment(' + p.row + ')">✕</button>' +
             '</div>';
           });
         }

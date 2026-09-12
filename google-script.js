@@ -1,4 +1,16 @@
-var PASSWORD = 'LISA';
+var PASSWORD = 'jewelry2026';
+
+function getPaymentsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('Payments');
+  if (!sheet) {
+    sheet = ss.insertSheet('Payments');
+    sheet.appendRow(['Date', 'Amount']);
+    sheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#f0f0f0');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
 
 function doGet(e) {
   if (!e || !e.parameter) {
@@ -10,6 +22,33 @@ function doGet(e) {
   }
   var action = e.parameter.action;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // ===== Lisa 转账记录（存 Payments 表）=====
+  if (action === 'payments_list') {
+    var ps = getPaymentsSheet();
+    var pd = ps.getDataRange().getValues();
+    var list = [];
+    for (var i = 1; i < pd.length; i++) {
+      list.push({ row: i + 1, date: pd[i][0] || '', amount: Number(pd[i][1]) || 0 });
+    }
+    return json({ payments: list });
+  }
+  if (action === 'payments_add') {
+    var pDate = e.parameter.date || '';
+    var pAmount = parseFloat(e.parameter.amount);
+    if (!pDate || !pAmount || pAmount <= 0) return json({ error: 'Missing date or amount' });
+    getPaymentsSheet().appendRow([pDate, pAmount]);
+    return json({ success: true });
+  }
+  if (action === 'payments_delete') {
+    var pRow = parseInt(e.parameter.row);
+    if (pRow && pRow > 1) {
+      getPaymentsSheet().deleteRow(pRow);
+      return json({ success: true });
+    }
+    return json({ error: 'Missing or invalid row' });
+  }
+
   var sheet = ss.getSheetByName('Orders');
   if (!sheet) {
     return json({ orders: [] });
