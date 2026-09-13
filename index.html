@@ -2015,6 +2015,37 @@
     var brandTapCount = 0;
     var brandTapTimer = null;
 
+    // ===== 带超时 + 自动重试的 fetch（应对 Apps Script 冷启动 / 手机网络抖动导致连接中断）=====
+    function fetchJsonRetry(url, retries, delayMs) {
+      retries = (retries === undefined) ? 2 : retries;
+      delayMs = delayMs || 900;
+      return new Promise(function(resolve, reject) {
+        function attempt(n) {
+          var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          var timer = setTimeout(function() { if (ctrl) ctrl.abort(); }, 15000);
+          var opts = ctrl ? { signal: ctrl.signal } : {};
+          fetch(url, opts)
+            .then(function(r) {
+              clearTimeout(timer);
+              return r.json();
+            })
+            .then(function(data) {
+              clearTimeout(timer);
+              resolve(data);
+            })
+            .catch(function(e) {
+              clearTimeout(timer);
+              if (n < retries) {
+                setTimeout(function() { attempt(n + 1); }, delayMs * (n + 1));
+              } else {
+                reject(e);
+              }
+            });
+        }
+        attempt(0);
+      });
+    }
+
     // 点击品牌名 3 次直接进入后台
     function onBrandTap() {
       brandTapCount++;
@@ -2059,8 +2090,7 @@
       body.innerHTML = '<div class="admin-loading">Loading orders...</div>';
       document.getElementById('adminFilterTabs').style.display = 'none';
 
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=list')
-        .then(function(r) { return r.json(); })
+      fetchJsonRetry(ADMIN_URL + '?password=' + ADMIN_PW + '&action=list')
         .then(function(data) {
           if (data.error) {
             body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Error: ' + data.error + '</div>';
@@ -2075,7 +2105,7 @@
           renderAdminOrders('All');
         })
         .catch(function(e) {
-          body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Network error: ' + e.message + '</div>';
+          body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Couldn\'t load orders — connection dropped.<div style="margin-top:12px"><button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Try again</button></div></div>';
         });
     }
 
@@ -2096,8 +2126,7 @@
     function loadPaymentsAndRender() {
       var body = document.getElementById('summaryBody');
       body.innerHTML = '<div class="admin-loading">Loading payments…</div>';
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_list')
-        .then(function(r) { return r.json(); })
+      fetchJsonRetry(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_list')
         .then(function(data) {
           var payments = (data && Array.isArray(data.payments)) ? data.payments : null;
           renderSummary(payments);
