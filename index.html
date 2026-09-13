@@ -2171,9 +2171,9 @@
 
         var bal = Math.round((shippedTotal - paidTotal) * 100) / 100;
         var balCls, balTxt;
-        if (bal > 0.005) { balCls = 'owes'; balTxt = 'Lisa owes you $' + bal.toFixed(2); }
-        else if (bal < -0.005) { balCls = 'paid'; balTxt = 'You over-received $' + (-bal).toFixed(2) + ' (Lisa paid extra)'; }
-        else { balCls = 'even'; balTxt = 'Settled ✓'; }
+        if (bal > 0.005) { balCls = 'owes'; balTxt = 'Balance due: $' + bal.toFixed(2); }
+        else if (bal < -0.005) { balCls = 'paid'; balTxt = 'Lisa\'s credit: $' + (-bal).toFixed(2); }
+        else { balCls = 'even'; balTxt = 'All settled ✓'; }
         html += '<div class="summary-balance ' + balCls + '">' + balTxt + '</div>';
 
         // 转账记录列表
