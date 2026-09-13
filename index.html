@@ -546,6 +546,11 @@
       transition: all var(--transition);
     }
     .admin-delete-btn:active { background: var(--danger); color: #fff; }
+    .admin-locked {
+      display: inline-flex; align-items: center;
+      color: var(--text-light); border: 1.5px solid var(--border);
+      border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500;
+    }
     .admin-print-btn {
       background: #fff; border: 1.5px solid #4a6fa5; color: #4a6fa5;
       border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; font-weight: 500;
@@ -857,7 +862,7 @@
     <div class="summary-modal-content">
       <div class="summary-modal-header">
         <button class="checkout-back-btn" onclick="closeSummary()">←</button>
-        <h3>💰 对账 Summary</h3>
+        <h3>💰 Summary</h3>
         <span style="width:34px;"></span>
       </div>
       <div class="summary-modal-body" id="summaryBody"></div>
@@ -2090,7 +2095,7 @@
     }
     function loadPaymentsAndRender() {
       var body = document.getElementById('summaryBody');
-      body.innerHTML = '<div class="admin-loading">加载转账记录…</div>';
+      body.innerHTML = '<div class="admin-loading">Loading payments…</div>';
       fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_list')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -2101,30 +2106,30 @@
     }
     function addPayment() {
       var amount = parseFloat(document.getElementById('payAmount').value);
-      if (!amount || amount <= 0) { showToast('⚠️ 先填金额', 2000); return; }
+      if (!amount || amount <= 0) { showToast('⚠️ Enter an amount first', 2000); return; }
       var date = document.getElementById('payDate').value || todayStr();
       var url = ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_add&date=' + encodeURIComponent(date) + '&amount=' + amount;
       fetch(url).then(function(r) { return r.json(); }).then(function(data) {
-        if (data.success) { showToast('✅ 已记录转账', 2000); loadPaymentsAndRender(); }
-        else { showToast('❌ ' + (data.error || '保存失败'), 3000); }
+        if (data.success) { showToast('✅ Payment recorded', 2000); loadPaymentsAndRender(); }
+        else { showToast('❌ ' + (data.error || 'Save failed'), 3000); }
       }).catch(function(e) { showToast('❌ ' + e.message, 3000); });
     }
     function deletePayment(row) {
-      if (!confirm('删除这条转账记录？')) return;
+      if (!confirm('Delete this payment record?')) return;
       fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_delete&row=' + row)
         .then(function(r) { return r.json(); })
         .then(function(data) {
-          if (data.success) { showToast('↩️ 已删除', 1500); loadPaymentsAndRender(); }
-          else { showToast('❌ ' + (data.error || '删除失败'), 3000); }
+          if (data.success) { showToast('↩️ Deleted', 1500); loadPaymentsAndRender(); }
+          else { showToast('❌ ' + (data.error || 'Delete failed'), 3000); }
         }).catch(function(e) { showToast('❌ ' + e.message, 3000); });
     }
     function copyPayments() {
       var list = window._payments || [];
-      if (list.length === 0) { showToast('还没有记录', 1500); return; }
+      if (list.length === 0) { showToast('No records yet', 1500); return; }
       var txt = list.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; })
         .map(function(p) { return p.date + '  $' + (Number(p.amount) || 0).toFixed(2); }).join('\n');
-      navigator.clipboard.writeText(txt).then(function() { showToast('✅ 已复制，可粘贴备份', 1500); })
-        .catch(function() { showToast('⚠️ 复制失败', 2000); });
+      navigator.clipboard.writeText(txt).then(function() { showToast('✅ Copied — paste as backup', 1500); })
+        .catch(function() { showToast('⚠️ Copy failed', 2000); });
     }
     function renderSummary(payments) {
       window._payments = payments || [];
@@ -2132,7 +2137,7 @@
       var orders = window._adminOrders;
 
       if (!orders) {
-        html += '<div style="color:var(--text-light);padding:12px 0;">⚠️ 订单还没加载，点右上角 Refresh 后再看对账。</div>';
+        html += '<div style="color:var(--text-light);padding:12px 0;">⚠️ Orders not loaded yet. Tap Refresh (top right) then reopen Summary.</div>';
       } else {
         var fullyCount = 0, fullySum = 0;
         var partialCount = 0, partialShippedSum = 0, partialRemainingSum = 0;
@@ -2154,29 +2159,29 @@
         });
         var shippedTotal = fullySum + partialShippedSum;
 
-        html += '<div class="summary-stat"><span class="summary-stat-label">✅ 全部发货（' + fullyCount + ' 单）</span><span class="summary-stat-value">$' + fullySum.toFixed(2) + '</span></div>';
-        html += '<div class="summary-stat"><span class="summary-stat-label">🟠 部分发货（' + partialCount + ' 单 · 已发部分）</span><span class="summary-stat-value">$' + partialShippedSum.toFixed(2) + '</span></div>';
+        html += '<div class="summary-stat"><span class="summary-stat-label">✅ Fully shipped (' + fullyCount + ' orders)</span><span class="summary-stat-value">$' + fullySum.toFixed(2) + '</span></div>';
+        html += '<div class="summary-stat"><span class="summary-stat-label">🟠 Partially shipped (' + partialCount + ' orders · shipped portion)</span><span class="summary-stat-value">$' + partialShippedSum.toFixed(2) + '</span></div>';
         if (partialCount > 0) {
-          html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ 其中还没发</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
+          html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ Still not shipped</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
         }
-        html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 已发货总额</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
+        html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 Total shipped value</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
 
         var paidTotal = window._payments.reduce(function(a, p) { return a + (Number(p.amount) || 0); }, 0);
-        html += '<div class="summary-stat"><span class="summary-stat-label">💵 Lisa 已转账（' + window._payments.length + ' 笔）</span><span class="summary-stat-value">$' + paidTotal.toFixed(2) + '</span></div>';
+        html += '<div class="summary-stat"><span class="summary-stat-label">💵 Lisa paid (' + window._payments.length + ' payments)</span><span class="summary-stat-value">$' + paidTotal.toFixed(2) + '</span></div>';
 
         var bal = Math.round((shippedTotal - paidTotal) * 100) / 100;
         var balCls, balTxt;
-        if (bal > 0.005) { balCls = 'owes'; balTxt = 'Lisa 还欠你 $' + bal.toFixed(2); }
-        else if (bal < -0.005) { balCls = 'paid'; balTxt = '你多收了 $' + (-bal).toFixed(2) + '（Lisa 多打了）'; }
-        else { balCls = 'even'; balTxt = '已结清 ✓'; }
+        if (bal > 0.005) { balCls = 'owes'; balTxt = 'Lisa owes you $' + bal.toFixed(2); }
+        else if (bal < -0.005) { balCls = 'paid'; balTxt = 'You over-received $' + (-bal).toFixed(2) + ' (Lisa paid extra)'; }
+        else { balCls = 'even'; balTxt = 'Settled ✓'; }
         html += '<div class="summary-balance ' + balCls + '">' + balTxt + '</div>';
 
         // 转账记录列表
-        html += '<div style="margin-top:18px;font-weight:700;font-size:14px;">💵 Lisa 转账记录</div>';
+        html += '<div style="margin-top:18px;font-weight:700;font-size:14px;">💵 Lisa\'s payments</div>';
         if (payments === null) {
-          html += '<div style="color:var(--danger);font-size:13px;padding:8px 0;">⚠️ 转账记录加载失败（后台脚本还没升级？）。订单对账不受影响。</div>';
+          html += '<div style="color:var(--danger);font-size:13px;padding:8px 0;">⚠️ Failed to load payments (backend not upgraded yet?). Order totals are unaffected.</div>';
         } else if (window._payments.length === 0) {
-          html += '<div style="color:var(--text-light);font-size:13px;padding:8px 0;">还没有记录，在下面添加 Lisa 每次转的钱。</div>';
+          html += '<div style="color:var(--text-light);font-size:13px;padding:8px 0;">No records yet. Add each of Lisa\'s payments below.</div>';
         } else {
           window._payments.slice().sort(function(a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; }).forEach(function(p) {
             html += '<div class="payment-row">' +
@@ -2188,10 +2193,10 @@
         }
         html += '<div class="payment-add-row">' +
           '<input type="date" class="payment-add-date" id="payDate" value="' + todayStr() + '">' +
-          '<input type="number" class="payment-add-amount" id="payAmount" placeholder="金额 $" min="0" step="0.01">' +
+          '<input type="number" class="payment-add-amount" id="payAmount" placeholder="Amount $" min="0" step="0.01">' +
           '<button class="payment-add-btn" onclick="addPayment()">Add</button>' +
         '</div>';
-        html += '<div style="margin-top:10px;"><button class="admin-refresh-btn" onclick="copyPayments()">📋 Copy 备份记录</button></div>';
+        html += '<div style="margin-top:10px;"><button class="admin-refresh-btn" onclick="copyPayments()">📋 Copy records</button></div>';
       }
 
       document.getElementById('summaryBody').innerHTML = html;
@@ -2272,7 +2277,9 @@
             '</select>' +
             '<div style="display:flex;gap:6px;">' +
               '<button class="admin-print-btn" onclick="printAdminOrder(' + i + ')">🖨️ Print</button>' +
-              '<button class="admin-delete-btn" onclick="deleteOrder(event, ' + o._row + ', ' + i + ')">🗑 Delete</button>' +
+              (o['Status'] === 'Shipped' || st.shipped > 0
+                ? '<span class="admin-locked" title="Shipped orders cannot be deleted">🔒 Locked</span>'
+                : '<button class="admin-delete-btn" onclick="deleteOrder(event, ' + o._row + ', ' + i + ')">🗑 Delete</button>') +
             '</div>' +
           '</div>' +
           '<div class="admin-order-detail" id="adminDetail' + i + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">' +

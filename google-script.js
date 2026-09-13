@@ -83,6 +83,19 @@ function doGet(e) {
   if (action === 'delete') {
     var row = parseInt(e.parameter.row);
     if (row && row > 1) {
+      // 已发货订单不允许删除（已发出即需付款，删除会丢账）
+      var delStatus = sheet.getRange(row, 10).getValue();
+      var delShipCell = sheet.getRange(row, 13).getValue();
+      if (delStatus === 'Shipped') {
+        return json({ success: false, error: 'Shipped orders cannot be deleted' });
+      }
+      if (delShipCell) {
+        var delShips = [];
+        try { delShips = JSON.parse(delShipCell); } catch(e) { delShips = []; }
+        if (Array.isArray(delShips) && delShips.length > 0) {
+          return json({ success: false, error: 'Order has shipped items and cannot be deleted' });
+        }
+      }
       sheet.deleteRow(row);
       return json({ success: true });
     }
