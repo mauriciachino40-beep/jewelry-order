@@ -457,8 +457,8 @@
       /* 隐藏所有页面元素 */
       body > * { display: none !important; }
 
-      /* 只打印发票内容 */
-      #printArea { display: block !important; }
+      /* 只打印发票内容（需 .print-active 才显示，避免残留内容混入确认页打印） */
+      #printArea.print-active { display: block !important; }
 
       /* 只显示确认页面或订单详情 */
       .confirm-modal.show, #orderDetailModal.show {
@@ -1812,7 +1812,12 @@
       ].filter(Boolean).join('\n');
     }
 
+    function clearPrintArea() {
+      var a = document.getElementById('printArea');
+      if (a) { a.innerHTML = ''; a.classList.remove('print-active'); }
+    }
     function printOrder() {
+      clearPrintArea();
       window.print();
     }
 
@@ -1937,6 +1942,7 @@
       }
     }
     function printOrderDetail() {
+      clearPrintArea();
       window.print();
     }
 
@@ -2625,8 +2631,10 @@
 
       var area = document.getElementById('printArea');
       area.innerHTML = html;
+      area.classList.add('print-active');
+      // 不再用 setTimeout 清空：手机上 window.print() 是异步的，过早清空会导致打印空白。
+      // 内容留在隐藏的 #printArea 里，下次打印会覆盖；确认页打印前由 clearPrintArea() 清掉。
       window.print();
-      setTimeout(function() { area.innerHTML = ''; }, 100);
     }
 
     function deleteOrder(ev, row, i) {
