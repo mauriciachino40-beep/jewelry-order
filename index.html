@@ -763,6 +763,7 @@
       <button class="admin-filter-tab" data-filter="New" onclick="filterAdminOrders('New')">🆕 New</button>
       <button class="admin-filter-tab" data-filter="Processing" onclick="filterAdminOrders('Processing')">⏳ Processing</button>
       <button class="admin-filter-tab" data-filter="Partial" onclick="filterAdminOrders('Partial')">🟠 Partial</button>
+      <button class="admin-filter-tab" data-filter="Compensation" onclick="filterAdminOrders('Compensation')">🎁 Complimentary</button>
       <button class="admin-filter-tab" data-filter="Shipped" onclick="filterAdminOrders('Shipped')">📦 Shipped</button>
       <button class="admin-filter-tab" data-filter="Cancelled" onclick="filterAdminOrders('Cancelled')">❌ Cancelled</button>
     </div>
@@ -787,9 +788,10 @@
     <div class="cart-onhold" id="cartOnHold"></div>
     <div class="cart-panel-footer">
       <div class="cart-subtotal">
-        <span class="cart-subtotal-label">Subtotal</span>
+        <span class="cart-subtotal-label" id="cartSubtotalLabel">Amount Due</span>
         <span class="cart-subtotal-value" id="cartSubtotal">$0.00</span>
       </div>
+      <div id="cartComplimentarySummary" style="display:none;font-size:12px;color:#805b12;margin:-3px 0 9px;text-align:right;"></div>
       <div class="cart-actions-row">
         <button class="cart-hold-btn" id="cartHoldBtn" disabled onclick="openHoldModal()">📌 Hold</button>
         <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="openCheckout()">Proceed to Checkout</button>
@@ -926,11 +928,12 @@
       <div class="checkout-section">
         <h3>📋 Order Review</h3>
         <div class="checkout-items" id="checkoutItemsReview"></div>
+        <div id="checkoutComplimentarySummary" style="display:none;background:#fff8e8;border:1px solid #f1d28b;border-radius:8px;padding:10px;margin-top:12px;font-size:13px;color:#805b12;"></div>
       </div>
     </div>
     <div class="checkout-submit">
       <div class="checkout-total-row">
-        <span>Total</span>
+        <span id="checkoutTotalLabel">Amount Due</span>
         <span id="checkoutTotal">$0.00</span>
       </div>
       <button class="submit-btn" id="submitBtn" onclick="submitOrder()">Place Order</button>
@@ -1242,6 +1245,7 @@
       const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
       let migrated = false;
       cart.forEach(item => {
+        if (!item.billingType) { item.billingType = 'Regular'; migrated = true; }
         for (const k in item.variants) {
           if (COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
           if (k === 'Size' && /^\d+$/.test(item.variants[k])) { item.variants[k] = item.variants[k] + 'cm'; migrated = true; }
@@ -1417,7 +1421,8 @@
       // 检查购物车里是否已有同产品+同规格
       const existingIdx = cart.findIndex(item =>
         item.productId === productId &&
-        JSON.stringify(item.variants) === JSON.stringify(variants)
+        JSON.stringify(item.variants) === JSON.stringify(variants) &&
+        (item.billingType || 'Regular') === 'Regular'
       );
 
       if (existingIdx >= 0) {
@@ -1430,7 +1435,11 @@
           price: effectivePrice,
           image: getProductImage(product),
           variants: variants,
-          quantity: quantity
+          quantity: quantity,
+          billingType: 'Regular',
+          relatedOrderId: '',
+          compensationReason: '',
+          giftNote: ''
         });
       }
 
@@ -1471,8 +1480,59 @@
       if (confirm('Remove all items from cart?')) { cart = []; saveCart(); updateCartUI(); }
     }
 
-    function getCartTotal() { return cart.reduce((s, i) => s + i.price * i.quantity, 0); }
+    function getCartReferenceTotal() { return cart.reduce((s, i) => s + i.price * i.quantity, 0); }
+    function getCartTotal() { return cart.reduce((s, i) => s + (getItemBillingType(i) === 'Regular' ? i.price * i.quantity : 0), 0); }
+    function getCartComplimentaryTotal() { return getCartReferenceTotal() - getCartTotal(); }
     function getCartCount() { return cart.reduce((s, i) => s + i.quantity, 0); }
+    function getItemBillingType(item) { return item.billingType || 'Regular'; }
+    function getBillingLabel(type) {
+      if (type === 'Compensation') return '↩️ Compensation — No charge';
+      if (type === 'Gift') return '🎁 Gift — No charge';
+      return 'Regular — billed to customer';
+    }
+    function getBillingBadgeHTML(item) {
+      const type = getItemBillingType(item);
+      if (type === 'Regular') return '';
+      return `<span style="display:inline-block;margin-top:5px;padding:3px 8px;border-radius:12px;background:#fff8e8;border:1px solid #f1d28b;color:#805b12;font-size:11px;font-weight:700;">${getBillingLabel(type)}</span>`;
+    }
+    function updateCartItemBillingType(cartItemId, type) {
+      const item = cart.find(i => i.cartItemId === cartItemId);
+      if (!item) return;
+      item.billingType = type;
+      if (type !== 'Compensation') { item.relatedOrderId = ''; item.compensationReason = ''; }
+      if (type !== 'Gift') item.giftNote = '';
+      saveCart(); updateCartUI();
+    }
+    function updateCartItemBillingDetail(cartItemId, field, value) {
+      const item = cart.find(i => i.cartItemId === cartItemId);
+      if (!item) return;
+      item[field] = value;
+      saveCart();
+    }
+    function getStoredOrderItems(order) {
+      if (Array.isArray(order && order.items)) return order.items;
+      try {
+        const raw = order && order['Items Data'];
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) { return []; }
+    }
+    function getOrderFinancials(order) {
+      const items = getStoredOrderItems(order);
+      const hasItemBillingTypes = items.some(item => item.billingType);
+      const reference = items.length ? items.reduce((sum, item) => sum + (Number(item.subtotal) || (Number(item.price) || 0) * (Number(item.quantity) || 0)), 0) : (Number(order && (order.referenceTotal || order['Reference Total'])) || Number(order && (order.total || order['Total'])) || 0);
+      const billable = hasItemBillingTypes ? items.reduce((sum, item) => {
+        const lineTotal = Number(item.subtotal) || (Number(item.price) || 0) * (Number(item.quantity) || 0);
+        return sum + (String(item.billingType || 'Regular') === 'Regular' ? lineTotal : 0);
+      }, 0) : (Number(order && (order.total || order['Total'])) || 0);
+      return { items, reference: reference, billable: billable, complimentary: Math.max(0, reference - billable) };
+    }
+    function getComplimentaryItems(order) {
+      return getStoredOrderItems(order).filter(item => ['Compensation', 'Gift'].includes(String(item.billingType || '')));
+    }
+    function getCompensationItems(order) {
+      return getComplimentaryItems(order).filter(item => String(item.billingType || '') === 'Compensation');
+    }
 
     // ============================================================
     // CART UI
@@ -1498,7 +1558,12 @@
     function renderCartPanel() {
       const container = document.getElementById('cartItems');
       const total = getCartTotal();
+      const complimentaryTotal = getCartComplimentaryTotal();
       document.getElementById('cartSubtotal').textContent = `$${total.toFixed(2)}`;
+      document.getElementById('cartSubtotalLabel').textContent = 'Amount Due';
+      const compSummary = document.getElementById('cartComplimentarySummary');
+      compSummary.style.display = complimentaryTotal > 0 ? 'block' : 'none';
+      compSummary.textContent = complimentaryTotal > 0 ? `🎁 Complimentary items — not billed (ref. $${complimentaryTotal.toFixed(2)})` : '';
       document.getElementById('cartCheckoutBtn').disabled = cart.length === 0;
       document.getElementById('cartHoldBtn').disabled = cart.length === 0;
       renderOnHold();
@@ -1518,13 +1583,32 @@
           return ai - bi;
         });
         const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
+        const billingType = getItemBillingType(item);
+        const billingDetails = billingType === 'Compensation' ? `
+          <div style="margin-top:8px;padding:8px;background:#fff8e8;border-radius:8px;border:1px solid #f1d28b;">
+            <input class="form-input" value="${escStr(item.relatedOrderId || '')}" placeholder="Original order ID *" onchange="updateCartItemBillingDetail(${item.cartItemId}, 'relatedOrderId', this.value)" style="margin-bottom:6px;padding:8px 10px;font-size:12px;">
+            <input class="form-input" value="${escStr(item.compensationReason || '')}" placeholder="Compensation reason *" onchange="updateCartItemBillingDetail(${item.cartItemId}, 'compensationReason', this.value)" style="padding:8px 10px;font-size:12px;">
+          </div>` : billingType === 'Gift' ? `
+          <div style="margin-top:8px;padding:8px;background:#fff8e8;border-radius:8px;border:1px solid #f1d28b;">
+            <input class="form-input" value="${escStr(item.giftNote || '')}" placeholder="Gift note (optional)" onchange="updateCartItemBillingDetail(${item.cartItemId}, 'giftNote', this.value)" style="padding:8px 10px;font-size:12px;">
+          </div>` : '';
         return `
           <div class="cart-item">
             <img class="cart-item-image" src="${item.image}" alt="${item.name}" onerror="this.style.display='none'">
             <div class="cart-item-details">
               <div class="cart-item-name">${item.name}</div>
               <div class="cart-item-variants">${vt}</div>
-              <div class="cart-item-price">$${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)}</div>
+              <div class="cart-item-price">${billingType === 'Regular' ? `$${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)}` : `Reference: $${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)} · $0 due`}</div>
+              <div style="margin-top:7px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <span style="font-size:11px;color:var(--text-light);font-weight:600;">Charge:</span>
+                <select class="admin-status-select" onchange="updateCartItemBillingType(${item.cartItemId}, this.value)" style="font-size:11px;">
+                  <option value="Regular"${billingType === 'Regular' ? ' selected' : ''}>Regular order</option>
+                  <option value="Compensation"${billingType === 'Compensation' ? ' selected' : ''}>Compensation / replacement</option>
+                  <option value="Gift"${billingType === 'Gift' ? ' selected' : ''}>Gift</option>
+                </select>
+              </div>
+              ${getBillingBadgeHTML(item)}
+              ${billingDetails}
               <div class="cart-item-actions">
                 <div class="cart-item-qty">
                   <button class="cart-qty-btn" onclick="updateCartItemQty(${item.cartItemId}, -1)">−</button>
@@ -1633,7 +1717,8 @@
     }
     function openCheckout() {
       if (cart.length === 0) return;
-      closeCart(); renderCheckoutReview();
+      closeCart();
+      renderCheckoutReview();
       document.getElementById('checkoutModal').classList.add('show');
       document.body.style.overflow = 'hidden';
     }
@@ -1662,17 +1747,29 @@
           return ai - bi;
         });
         const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
+        const billingType = getItemBillingType(item);
+        const detail = billingType === 'Compensation'
+          ? `Original order: ${escStr(item.relatedOrderId || 'Not set')}<br>Reason: ${escStr(item.compensationReason || 'Not set')}`
+          : billingType === 'Gift' && item.giftNote ? `Gift note: ${escStr(item.giftNote)}` : '';
         return `
           <div class="checkout-item-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
             <img src="${item.image}" alt="${item.name}" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">
             <div style="flex:1;min-width:0;">
               <div style="font-weight:600;font-size:13px;">${item.name}</div>
               <div style="font-weight:700;font-size:14px;">${vt}</div>
-              <div style="font-size:12px;">$${item.price.toFixed(2)} × ${item.quantity} = <strong>$${(item.price*item.quantity).toFixed(2)}</strong></div>
+              <div style="font-size:12px;">${billingType === 'Regular' ? `$${item.price.toFixed(2)} × ${item.quantity} = <strong>$${(item.price*item.quantity).toFixed(2)}</strong>` : `Reference: $${item.price.toFixed(2)} × ${item.quantity} = <strong>$${(item.price*item.quantity).toFixed(2)}</strong> · $0 due`}</div>
+              ${getBillingBadgeHTML(item)}
+              ${detail ? `<div style="font-size:11px;color:#805b12;margin-top:4px;line-height:1.4;">${detail}</div>` : ''}
             </div>
           </div>`;
       }).join('');
-      document.getElementById('checkoutTotal').textContent = `$${getCartTotal().toFixed(2)}`;
+      const total = getCartTotal();
+      const complimentaryTotal = getCartComplimentaryTotal();
+      document.getElementById('checkoutTotal').textContent = `$${total.toFixed(2)}`;
+      document.getElementById('checkoutTotalLabel').textContent = 'Amount Due';
+      const complimentarySummary = document.getElementById('checkoutComplimentarySummary');
+      complimentarySummary.style.display = complimentaryTotal > 0 ? 'block' : 'none';
+      complimentarySummary.innerHTML = complimentaryTotal > 0 ? `<strong>🎁 Complimentary items — not included in customer's bill</strong><br>Reference value: $${complimentaryTotal.toFixed(2)} · The amount due above only includes regular items.` : '';
     }
 
     function populateStates() {
@@ -1685,6 +1782,8 @@
       if (!name) { showToast('⚠️ Please enter your name'); return false; }
       const email = document.getElementById('inputEmail').value.trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('⚠️ Please enter a valid email'); return false; }
+      const incompleteCompensation = cart.find(item => getItemBillingType(item) === 'Compensation' && (!String(item.relatedOrderId || '').trim() || !String(item.compensationReason || '').trim()));
+      if (incompleteCompensation) { showToast('⚠️ Each compensation item needs the original order ID and reason'); return false; }
       return true;
     }
 
@@ -1694,6 +1793,12 @@
       btn.textContent = 'Processing...'; btn.classList.add('loading');
 
       const orderId = 'ORD-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).slice(2,6).toUpperCase();
+      const referenceTotal = getCartReferenceTotal();
+      const total = getCartTotal();
+      const complimentaryTotal = getCartComplimentaryTotal();
+      const compensationItems = cart.filter(item => getItemBillingType(item) === 'Compensation');
+      const giftItems = cart.filter(item => getItemBillingType(item) === 'Gift');
+      const orderType = compensationItems.length && giftItems.length ? 'Mixed — Compensation + Gift' : compensationItems.length ? (cart.length === compensationItems.length ? 'Compensation' : 'Mixed — Compensation') : giftItems.length ? (cart.length === giftItems.length ? 'Gift' : 'Mixed — Gift') : 'Standard';
       const orderData = {
         orderId,
         date: new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }),
@@ -1708,9 +1813,17 @@
           zip: document.getElementById('inputZip').value.trim(),
         },
         items: cart.map(i => ({
-          name: i.name, image: i.image, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity
+          name: i.name, image: i.image, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity,
+          billingType: getItemBillingType(i),
+          billableSubtotal: getItemBillingType(i) === 'Regular' ? i.price * i.quantity : 0,
+          relatedOrderId: i.relatedOrderId || '', compensationReason: i.compensationReason || '', giftNote: i.giftNote || ''
         })),
-        total: getCartTotal(),
+        total,
+        referenceTotal,
+        complimentaryTotal,
+        orderType,
+        relatedOrderId: compensationItems.map(item => item.relatedOrderId).filter(Boolean).filter((value, index, arr) => arr.indexOf(value) === index).join(', '),
+        compensationReason: compensationItems.map(item => item.compensationReason).filter(Boolean).join(' | '),
         notes: document.getElementById('inputNotes').value.trim()
       };
 
@@ -1765,7 +1878,7 @@
       });
       const itemsRows = data.items.map((it, i) => {
         const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k])).join(', ');
-        return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
+        return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal, billingType: it.billingType || 'Regular', relatedOrderId: it.relatedOrderId || '', compensationReason: it.compensationReason || '', giftNote: it.giftNote || '' };
       });
 
       // 屏幕显示 — 带图片
@@ -1775,19 +1888,27 @@
           <div style="flex:1;min-width:0;">
             <div style="font-weight:600;font-size:14px;">${r.name}</div>
             <div style="font-weight:700;font-size:14px;">${r.variants}</div>
-            <div style="font-size:13px;">$${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong></div>
+            <div style="font-size:13px;">${r.billingType === 'Regular' ? `$${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong>` : `Reference: $${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong> · $0 due`}</div>
+            ${r.billingType !== 'Regular' ? `<span style="display:inline-block;margin-top:5px;padding:3px 8px;border-radius:12px;background:#fff8e8;border:1px solid #f1d28b;color:#805b12;font-size:11px;font-weight:700;">${getBillingLabel(r.billingType)}</span>` : ''}
+            ${r.billingType === 'Compensation' ? `<div style="font-size:11px;color:#805b12;margin-top:4px;">Original order: ${escStr(r.relatedOrderId)} · ${escStr(r.compensationReason)}</div>` : r.billingType === 'Gift' && r.giftNote ? `<div style="font-size:11px;color:#805b12;margin-top:4px;">${escStr(r.giftNote)}</div>` : ''}
           </div>
         </div>
       `).join('');
 
+      const financials = getOrderFinancials(data);
+      const complimentaryHTML = financials.complimentary > 0 ? `<div style="background:#fff8e8;border:1px solid #f1d28b;border-radius:8px;padding:10px;margin:12px 0;color:#805b12;">
+        <strong>🎁 Complimentary items — not included in customer's bill</strong><br>
+        <span style="font-size:12px;">Reference value: $${financials.complimentary.toFixed(2)}</span>
+      </div>` : '';
       document.getElementById('confirmSummary').innerHTML = `
         <strong>Order #${data.orderId}</strong><br>
         <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
         <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr || '(no address provided)'}<br>${data.customer.phone ? '📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}<br>
-        ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
+        ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}
+        ${complimentaryHTML}<br>
         <strong>🛒 Items:</strong><br>
         ${itemsListHTML}<br>
-        <strong style="font-size:18px;">💰 Total: $${data.total.toFixed(2)}</strong>`;
+        <strong style="font-size:18px;">💰 Amount Due: $${financials.billable.toFixed(2)}</strong>`;
 
       // 打印版本 — 纯表格
       window._lastOrder = data;
@@ -1801,14 +1922,16 @@
         data.customer.phone ? `📞 ${data.customer.phone}` : '',
         data.customer.email ? `📧 ${data.customer.email}` : '',
         data.notes ? `📝 Notes: ${data.notes}` : '',
+        financials.complimentary > 0 ? `🎁 Complimentary items — not included in customer's bill (ref. $${financials.complimentary.toFixed(2)})` : '',
         ``,
         `🛒 *Items:*`,
         ...data.items.map((it, i) => {
           const vt = Object.values(it.variants).join(', ');
-          return `${i+1}. ${it.name} (${vt}) × ${it.quantity} = $${it.subtotal.toFixed(2)}`;
+          const tag = it.billingType && it.billingType !== 'Regular' ? ` — ${getBillingLabel(it.billingType)}` : '';
+          return `${i+1}. ${it.name} (${vt}) × ${it.quantity}${tag}`;
         }),
         ``,
-        `💰 *Total: $${data.total.toFixed(2)}*`
+        `💰 *Amount Due: $${financials.billable.toFixed(2)}*`
       ].filter(Boolean).join('\n');
     }
 
@@ -1871,6 +1994,7 @@
         const itemCount = o.items.reduce((s, i) => s + i.quantity, 0);
         const itemSummary = o.items.map(i => i.name.split(' (')[0]).slice(0, 2).join(', ') + (o.items.length > 2 ? '...' : '');
         const cancelled = o.cancelled;
+        const financials = getOrderFinancials(o);
         return `
           <div class="order-card${cancelled ? ' cancelled' : ''}" onclick="openOrderDetail(${idx})" style="display:flex;justify-content:space-between;align-items:center;">
             <div style="flex:1;min-width:0;">
@@ -1879,7 +2003,8 @@
                 <span class="order-card-date">${o.date}</span>
               </div>
               <div class="order-card-info">${itemSummary} · ${itemCount} item${itemCount>1?'s':''}</div>
-              <div class="order-card-total">💰 $${o.total.toFixed(2)}</div>
+              <div class="order-card-total">💰 Amount Due: $${financials.billable.toFixed(2)}</div>
+              ${financials.complimentary > 0 ? `<div style="margin-top:5px;font-size:12px;font-weight:700;color:#805b12;">🎁 Complimentary items — not billed (ref. $${financials.complimentary.toFixed(2)})</div>` : ''}
               ${cancelled ? `<div class="order-card-cancelled">🚫 Cancelled: ${o.cancelReason || 'N/A'}</div>` : ''}
             </div>
             <div style="font-size:24px;color:var(--text-light);flex-shrink:0;margin-left:8px;">›</div>
@@ -1902,7 +2027,7 @@
       });
       const itemsRows = data.items.map((it, i) => {
         const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k])).join(', ');
-        return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal };
+        return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal, billingType: it.billingType || 'Regular', relatedOrderId: it.relatedOrderId || '', compensationReason: it.compensationReason || '', giftNote: it.giftNote || '' };
       });
       const itemsListHTML = itemsRows.map(r => `
         <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
@@ -1910,7 +2035,9 @@
           <div style="flex:1;min-width:0;">
             <div style="font-weight:600;font-size:13px;">${r.name}</div>
             <div style="font-weight:700;font-size:14px;">${r.variants}</div>
-            <div style="font-size:12px;">$${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong></div>
+            <div style="font-size:12px;">${r.billingType === 'Regular' ? `$${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong>` : `Reference: $${r.price.toFixed(2)} × ${r.qty} = <strong>$${r.subtotal.toFixed(2)}</strong> · $0 due`}</div>
+            ${r.billingType !== 'Regular' ? `<span style="display:inline-block;margin-top:5px;padding:3px 8px;border-radius:12px;background:#fff8e8;border:1px solid #f1d28b;color:#805b12;font-size:11px;font-weight:700;">${getBillingLabel(r.billingType)}</span>` : ''}
+            ${r.billingType === 'Compensation' ? `<div style="font-size:11px;color:#805b12;margin-top:4px;">Original order: ${escStr(r.relatedOrderId)} · ${escStr(r.compensationReason)}</div>` : r.billingType === 'Gift' && r.giftNote ? `<div style="font-size:11px;color:#805b12;margin-top:4px;">${escStr(r.giftNote)}</div>` : ''}
           </div>
         </div>`).join('');
 
@@ -1921,14 +2048,20 @@
           <div style="color:var(--text-light);font-size:12px;">Cancelled at: ${data.cancelledAt || 'N/A'}</div>
         </div>` : '';
 
+      const financials = getOrderFinancials(data);
+      const complimentaryHTML = financials.complimentary > 0 ? `<div style="background:#fff8e8;border:1px solid #f1d28b;border-radius:8px;padding:12px;margin-bottom:16px;">
+          <div style="font-weight:700;color:#805b12;font-size:15px;">🎁 Complimentary items — not included in customer's bill</div>
+          <div style="font-size:13px;color:#805b12;margin-top:4px;">Reference value: $${financials.complimentary.toFixed(2)}</div>
+        </div>` : '';
       document.getElementById('orderDetailContent').innerHTML = `
         ${cancelledInfo}
+        ${complimentaryHTML}
         <strong>Order #${data.orderId}</strong><br>
         <span style="color:var(--text-light)">${data.date} (ET)</span><br><br>
         <strong>📦 Ship To:</strong><br>${data.customer.name}<br>${addr || '(no address provided)'}<br>${data.customer.phone ? '📞 ' + data.customer.phone : ''}${data.customer.email ? '<br>📧 ' + data.customer.email : ''}<br>
         ${data.notes ? `<br>📝 Notes: ${data.notes}<br>` : ''}<br>
         <strong>🛒 Items:</strong><br>${itemsListHTML}<br>
-        <strong style="font-size:18px;">💰 Total: $${data.total.toFixed(2)}</strong>`;
+        <strong style="font-size:18px;">💰 Amount Due: $${financials.billable.toFixed(2)}</strong>`;
 
       document.getElementById('cancelOrderBtn').style.display = data.cancelled ? 'none' : '';
       document.getElementById('overlay').classList.remove('show');
@@ -2176,16 +2309,27 @@
       } else {
         var fullyCount = 0, fullySum = 0;
         var partialCount = 0, partialShippedSum = 0, partialRemainingSum = 0;
+        var compensationCount = 0, compensationValue = 0;
         orders.forEach(function(o) {
-          var items = []; try { var r = o['Items Data']; items = typeof r === 'string' ? JSON.parse(r) : (r || []); } catch(e) { items = []; }
-          if (!Array.isArray(items)) items = [];
+          var financials = getOrderFinancials(o);
+          if (financials.complimentary > 0) {
+            compensationCount++;
+            compensationValue += financials.complimentary;
+          }
+          if (financials.billable <= 0) return;
+          var items = financials.items;
           var shipments = []; try { var s = o['Shipments']; shipments = s ? JSON.parse(s) : []; } catch(e) { shipments = []; }
           if (!Array.isArray(shipments)) shipments = [];
           var sidx = {}; shipments.forEach(function(sh) { (sh.items || []).forEach(function(x) { sidx[x] = true; }); });
           var shippedN = 0, shippedVal = 0;
-          items.forEach(function(it, n) { if (sidx[n]) { shippedN++; shippedVal += Number(it.subtotal) || 0; } });
+          items.forEach(function(it, n) {
+            if (sidx[n] && String(it.billingType || 'Regular') === 'Regular') {
+              shippedN++;
+              shippedVal += Number(it.billableSubtotal) || Number(it.subtotal) || 0;
+            }
+          });
           var status = o['Status'] || 'New';
-          var total = Number(o['Total']) || 0;
+          var total = financials.billable;
           if (status === 'Shipped' || (shippedN > 0 && shippedN === items.length)) {
             fullyCount++; fullySum += total;
           } else if (shippedN > 0) {
@@ -2200,6 +2344,9 @@
           html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ Still not shipped</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
         }
         html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 Total shipped value</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
+        if (compensationCount > 0) {
+          html += '<div class="summary-stat"><span class="summary-stat-label">🎁 Complimentary / replacement (' + compensationCount + ' orders, not billed)</span><span class="summary-stat-value" style="color:#805b12;">Ref. $' + compensationValue.toFixed(2) + '</span></div>';
+        }
 
         var paidTotal = window._payments.reduce(function(a, p) { return a + (Number(p.amount) || 0); }, 0);
         html += '<div class="summary-stat"><span class="summary-stat-label">💵 Lisa paid (' + window._payments.length + ' payments)</span><span class="summary-stat-value">$' + paidTotal.toFixed(2) + '</span></div>';
@@ -2240,7 +2387,9 @@
     function renderAdminOrders(filterStatus) {
       var orders = window._adminOrders;
       var filtered;
-      if (filterStatus === 'Partial') {
+      if (filterStatus === 'Compensation') {
+        filtered = orders.filter(function(o) { return isCompensationOrder(o); });
+      } else if (filterStatus === 'Partial') {
         filtered = orders.filter(function(o) {
           var st = getShipmentStats(o);
           return st.total > 0 && st.shipped > 0 && st.shipped < st.total;
@@ -2253,8 +2402,9 @@
 
       // 更新 filter tabs 徽标
       var tabs = document.querySelectorAll('#adminFilterTabs .admin-filter-tab');
-      var counts = { New: 0, Processing: 0, Shipped: 0, Cancelled: 0, Partial: 0 };
+      var counts = { New: 0, Processing: 0, Shipped: 0, Cancelled: 0, Partial: 0, Compensation: 0 };
       orders.forEach(function(o) {
+        if (isCompensationOrder(o)) counts['Compensation']++;
         var s = o['Status'] || 'New';
         counts[s] = (counts[s] || 0) + 1;
         var st = getShipmentStats(o);
@@ -2266,6 +2416,7 @@
         else if (key === 'New') tab.innerHTML = '🆕 New <span class="admin-filter-count">' + (counts['New'] || 0) + '</span>';
         else if (key === 'Processing') tab.innerHTML = '⏳ Processing <span class="admin-filter-count">' + (counts['Processing'] || 0) + '</span>';
         else if (key === 'Partial') tab.innerHTML = '🟠 Partial <span class="admin-filter-count">' + (counts['Partial'] || 0) + '</span>';
+        else if (key === 'Compensation') tab.innerHTML = '🎁 Complimentary <span class="admin-filter-count">' + (counts['Compensation'] || 0) + '</span>';
         else if (key === 'Shipped') tab.innerHTML = '📦 Shipped <span class="admin-filter-count">' + (counts['Shipped'] || 0) + '</span>';
         else if (key === 'Cancelled') tab.innerHTML = '❌ Cancelled <span class="admin-filter-count">' + (counts['Cancelled'] || 0) + '</span>';
         tab.classList.toggle('active', key === (filterStatus || 'All'));
@@ -2281,6 +2432,8 @@
 
       body.innerHTML = filtered.map(function(o) {
         var i = o._idx;
+        var financials = getOrderFinancials(o);
+        var complimentaryItems = getComplimentaryItems(o);
         var statusClass = 'status-' + (o['Status'] || 'New').replace(/\s/g, '');
         var itemsHTML = buildAdminShipItemsHTML(o, i);
         var adminNote = o['Admin Note'] || '';
@@ -2292,17 +2445,36 @@
           var txt = partial ? ('📦 ' + st.shipped + '/' + st.total + ' shipped · ' + (st.total - st.shipped) + ' left') : ('📦 ' + st.shipped + '/' + st.total + ' shipped');
           shipBadgeHTML = '<span class="ship-badge ' + cls + '">' + txt + '</span>';
         }
+        var compensationBadgeHTML = complimentaryItems.length ? '<span class="ship-badge" style="background:#fff8e8;color:#805b12;border:1px solid #f1d28b;">🎁 Has complimentary items</span>' : '';
+        var relatedCompensations = [];
+        orders.forEach(function(candidate) {
+          getCompensationItems(candidate).forEach(function(item) {
+            if (String(item.relatedOrderId || '').trim() === String(o['Order ID'] || '').trim()) relatedCompensations.push({ order: candidate, item: item });
+          });
+        });
+        var linkedCompensationsHTML = relatedCompensations.length ? '<div style="margin:12px 0;padding:10px;background:#fff8e8;border:1px solid #f1d28b;border-radius:8px;">' +
+          '<strong style="font-size:13px;color:#805b12;">🎁 Compensation sent for this order</strong>' +
+          relatedCompensations.map(function(link) { var value = Number(link.item.subtotal) || 0; return '<div style="font-size:12px;color:#805b12;margin-top:5px;">' +
+            escStr(link.order['Order ID']) + ' · ' + escStr(link.item.name || '') + ' · ' + escStr(link.item.compensationReason || 'No reason recorded') +
+            ' · Ref. $' + value.toFixed(2) + ' · ' + escStr(link.order['Status'] || 'New') + '</div>'; }).join('') +
+          '</div>' : '';
+        var compensationDetailsHTML = complimentaryItems.length ? '<div style="margin:10px 0;padding:10px;background:#fff8e8;border:1px solid #f1d28b;border-radius:8px;font-size:13px;color:#805b12;">' +
+          '<strong>🎁 Complimentary items — not included in customer bill</strong><br>' +
+          complimentaryItems.map(function(item) { return escStr(item.name || '') + ' · ' + escStr(getBillingLabel(item.billingType)) + (item.billingType === 'Compensation' ? ' · Original order: ' + escStr(item.relatedOrderId || 'N/A') + ' · ' + escStr(item.compensationReason || 'No reason recorded') : (item.giftNote ? ' · ' + escStr(item.giftNote) : '')); }).join('<br>') + '<br>' +
+          'Reference value: $' + financials.complimentary.toFixed(2) +
+          '</div>' : '';
         return '<div class="admin-order-card" onclick="toggleAdminDetail(' + i + ')" id="adminCard' + i + '">' +
           '<div class="admin-order-header">' +
             '<span class="admin-order-id">📋 ' + o['Order ID'] + '</span>' +
             '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;">' +
               '<span class="status-badge ' + statusClass + '">' + (o['Status'] || 'New') + '</span>' +
+              compensationBadgeHTML +
               shipBadgeHTML +
             '</div>' +
           '</div>' +
           '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
           '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
-          '<div class="admin-order-total">💰 $' + o['Total'] + '</div>' +
+          '<div class="admin-order-total">💰 Amount Due: $' + financials.billable.toFixed(2) + (financials.complimentary > 0 ? ' <span style="font-size:11px;font-weight:500;color:#805b12;">· 🎁 Not billed: Ref. $' + financials.complimentary.toFixed(2) + '</span>' : '') + '</div>' +
           '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
             '<select class="admin-status-select" onchange="updateOrderStatus(' + o._row + ', this.value, ' + i + ')">' +
               '<option value="New"' + (o['Status'] === 'New' ? ' selected' : '') + '>New</option>' +
@@ -2325,6 +2497,8 @@
               (o['Phone'] ? '📞 ' + o['Phone'] + '<br>' : '') +
             '</div>' +
             (o['Notes'] ? '<div style="margin-bottom:10px;"><strong>📝 Customer Note:</strong> ' + o['Notes'] + '</div>' : '') +
+            compensationDetailsHTML +
+            linkedCompensationsHTML +
             '<div><strong>🛒 Items:</strong></div>' +
             itemsHTML +
             '<div class="admin-note-section" style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">' +
@@ -2350,6 +2524,16 @@
 
     function filterAdminOrders(status) {
       renderAdminOrders(status);
+    }
+
+    function isCompensationOrder(o) {
+      if (getComplimentaryItems(o).length > 0) return true;
+      return /compensation|gift/i.test(String((o && o['Order Type']) || ''));
+    }
+
+    function getActiveAdminFilter() {
+      var activeTab = document.querySelector('#adminFilterTabs .admin-filter-tab.active');
+      return activeTab ? (activeTab.getAttribute('data-filter') || 'All') : 'All';
     }
 
     function editAdminNote(ev, i) {
@@ -2459,6 +2643,9 @@
               ' <button class="admin-unship-btn" onclick="unmarkShipItem(' + o._row + ', ' + i + ', ' + n + ')">↩ 取消</button>' +
             '</div>'
           : '';
+        var billingTag = String(it.billingType || 'Regular') !== 'Regular'
+          ? '<div style="display:inline-block;margin-top:4px;padding:2px 7px;border-radius:10px;background:#fff8e8;border:1px solid #f1d28b;color:#805b12;font-size:10px;font-weight:700;">' + escStr(getBillingLabel(it.billingType)) + '</div>'
+          : '';
         return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">' +
           '<div style="flex-shrink:0;width:18px;">' + leftHTML + '</div>' +
           '<img src="' + it.image + '" alt="' + it.name + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display=\'none\'">' +
@@ -2466,6 +2653,7 @@
             '<div style="font-weight:600;font-size:13px;">' + it.name + '</div>' +
             '<div style="font-weight:700;font-size:14px;">' + vt + '</div>' +
             '<div style="font-size:12px;">$' + (Number(it.price) || 0).toFixed(2) + ' × ' + it.quantity + ' = <strong>$' + (Number(it.subtotal) || 0).toFixed(2) + '</strong></div>' +
+            billingTag +
             shipInfo +
           '</div>' +
         '</div>';
@@ -2556,9 +2744,7 @@
     }
 
     function reRenderAdminKeepOpen(i) {
-      var activeTab = document.querySelector('#adminFilterTabs .admin-filter-tab.active');
-      var currentFilter = 'All';
-      if (activeTab) currentFilter = activeTab.textContent.replace(/[🆕⏳📦❌\d\s]/g, '').trim();
+      var currentFilter = getActiveAdminFilter();
       renderAdminOrders(currentFilter);
       var detail = document.getElementById('adminDetail' + i);
       if (detail) detail.style.display = 'block';
@@ -2568,6 +2754,8 @@
       var orders = window._adminOrders;
       if (!orders || !orders[i]) { showToast('Order not found'); return; }
       var o = orders[i];
+      var financials = getOrderFinancials(o);
+      var complimentaryItems = getComplimentaryItems(o);
 
       // 解析商品数据
       var itemsHTML;
@@ -2593,7 +2781,7 @@
                 '<div style="flex:1;min-width:0;">' +
                   '<div style="font-weight:600;font-size:12px;">' + (n + 1) + '. ' + it.name + '</div>' +
                   '<div style="font-weight:700;font-size:12px;color:#333;">' + vt + '</div>' +
-                  '<div style="font-size:11px;color:#555;">$' + (Number(it.price) || 0).toFixed(2) + ' × ' + it.quantity + ' = <strong>$' + (Number(it.subtotal) || 0).toFixed(2) + '</strong></div>' +
+                  '<div style="font-size:11px;color:#555;">' + (String(it.billingType || 'Regular') !== 'Regular' ? 'Qty: ' + it.quantity + ' · ' + escStr(getBillingLabel(it.billingType)) : '$' + (Number(it.price) || 0).toFixed(2) + ' × ' + it.quantity + ' = <strong>$' + (Number(it.subtotal) || 0).toFixed(2) + '</strong>') + '</div>' +
                 '</div>' +
               '</div>';
             }).join('') +
@@ -2614,6 +2802,9 @@
         '<div style="font-weight:bold;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">📝 Notes</div>' +
         '<div>' + o['Notes'] + '</div></div>' : '';
 
+      var compensationPrintHTML = complimentaryItems.length ? '<div style="margin:0 0 16px;padding:10px;border:1px solid #c99b34;border-radius:6px;color:#664500;font-size:13px;">' +
+        '<strong>COMPLIMENTARY ITEMS — NOT INCLUDED IN CUSTOMER BILL</strong><br>' +
+        complimentaryItems.map(function(item) { return escStr(item.name || '') + ' · ' + escStr(getBillingLabel(item.billingType)) + (item.billingType === 'Compensation' ? ' · Original order: ' + escStr(item.relatedOrderId || 'N/A') + ' · ' + escStr(item.compensationReason || 'No reason recorded') : ''); }).join('<br>') + '</div>' : '';
       var html = '<div style="font-family:Arial,Helvetica,sans-serif;color:#111;max-width:720px;margin:0 auto;padding:8px;">' +
         '<div style="text-align:center;font-size:22px;font-weight:bold;letter-spacing:1.5px;">JEWELRY WHOLESALE ORDER</div>' +
         '<div style="text-align:center;font-size:13px;color:#555;margin:4px 0 22px;">Order #' + (o['Order ID'] || '') + ' · ' + (o['Date (ET)'] || '') + '</div>' +
@@ -2622,11 +2813,12 @@
           shipLines +
         '</div>' +
         notesHTML +
+        compensationPrintHTML +
         '<div style="font-size:13px;margin-bottom:16px;">' +
           '<div style="font-weight:bold;font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">🛒 Order Items</div>' +
           itemsHTML +
         '</div>' +
-        '<div style="text-align:right;font-size:16px;font-weight:bold;border-top:2px solid #333;padding-top:10px;">TOTAL: $' + (o['Total'] || '0.00') + '</div>' +
+        '<div style="text-align:right;font-size:16px;font-weight:bold;border-top:2px solid #333;padding-top:10px;">AMOUNT DUE: $' + financials.billable.toFixed(2) + (financials.complimentary > 0 ? '<br><span style="font-size:11px;color:#664500;">Complimentary reference value: $' + financials.complimentary.toFixed(2) + ' — not billed</span>' : '') + '</div>' +
       '</div>';
 
       var area = document.getElementById('printArea');
@@ -2682,13 +2874,8 @@
               }
             }
             // 如果在筛选视图中，刷新使卡片移到正确的分组
-            var activeTab = document.querySelector('#adminFilterTabs .admin-filter-tab.active');
-            if (activeTab) {
-              var currentFilter = activeTab.textContent.replace(/[🆕⏳📦❌\d\s]/g, '').trim();
-              if (currentFilter !== 'All') {
-                setTimeout(function() { renderAdminOrders(currentFilter); }, 600);
-              }
-            }
+            var currentFilter = getActiveAdminFilter();
+            if (currentFilter !== 'All') setTimeout(function() { renderAdminOrders(currentFilter); }, 600);
           } else {
             showToast('❌ Update failed', 3000);
           }

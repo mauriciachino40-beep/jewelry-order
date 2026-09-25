@@ -1,5 +1,24 @@
 var PASSWORD = 'jewelry2026';
 
+// Keep column references stable even when an existing Orders sheet was created
+// before a new order field was introduced.
+function ensureOrderColumns(sheet, names) {
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var columns = {};
+  headers.forEach(function(header, index) {
+    if (header) columns[String(header)] = index + 1;
+  });
+  names.forEach(function(name) {
+    if (!columns[name]) {
+      var col = sheet.getLastColumn() + 1;
+      sheet.getRange(1, col).setValue(name).setFontWeight('bold').setBackground('#f0f0f0');
+      columns[name] = col;
+    }
+  });
+  return columns;
+}
+
 function getPaymentsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName('Payments');
@@ -74,7 +93,8 @@ function doGet(e) {
     var row = parseInt(e.parameter.row);
     var status = e.parameter.status;
     if (row && status) {
-      sheet.getRange(row, 10).setValue(status);
+      var statusCol = ensureOrderColumns(sheet, ['Status'])['Status'];
+      sheet.getRange(row, statusCol).setValue(status);
       return json({ success: true });
     }
     return json({ error: 'Missing row or status' });
@@ -84,8 +104,9 @@ function doGet(e) {
     var row = parseInt(e.parameter.row);
     if (row && row > 1) {
       // 已发货订单不允许删除（已发出即需付款，删除会丢账）
-      var delStatus = sheet.getRange(row, 10).getValue();
-      var delShipCell = sheet.getRange(row, 13).getValue();
+      var delColumns = ensureOrderColumns(sheet, ['Status', 'Shipments']);
+      var delStatus = sheet.getRange(row, delColumns['Status']).getValue();
+      var delShipCell = sheet.getRange(row, delColumns['Shipments']).getValue();
       if (delStatus === 'Shipped') {
         return json({ success: false, error: 'Shipped orders cannot be deleted' });
       }
@@ -106,13 +127,8 @@ function doGet(e) {
     var row = parseInt(e.parameter.row);
     var note = e.parameter.note || '';
     if (row && row > 0) {
-      // 确保第 12 列有表头
-      var lastCol = sheet.getLastColumn();
-      if (lastCol < 12) {
-        sheet.getRange(1, 12).setValue('Admin Note');
-        sheet.getRange(1, 12).setFontWeight('bold').setBackground('#f0f0f0');
-      }
-      sheet.getRange(row, 12).setValue(note);
+      var noteCol = ensureOrderColumns(sheet, ['Admin Note'])['Admin Note'];
+      sheet.getRange(row, noteCol).setValue(note);
       return json({ success: true });
     }
     return json({ error: 'Missing or invalid row' });
@@ -127,15 +143,11 @@ function doGet(e) {
     var items = itemsParam.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
     if (items.length === 0) return json({ error: 'No valid items' });
 
-    // 确保第 13 列有表头
-    var lastCol = sheet.getLastColumn();
-    if (lastCol < 13) {
-      sheet.getRange(1, 13).setValue('Shipments');
-      sheet.getRange(1, 13).setFontWeight('bold').setBackground('#f0f0f0');
-    }
+    var shipColumns = ensureOrderColumns(sheet, ['Shipments', 'Status', 'Items Data']);
+    var shipmentsCol = shipColumns['Shipments'];
 
     // 读已有发货记录
-    var cellVal = sheet.getRange(row, 13).getValue();
+    var cellVal = sheet.getRange(row, shipmentsCol).getValue();
     var shipments = [];
     if (cellVal) {
       try { shipments = JSON.parse(cellVal); } catch(e) { shipments = []; }
@@ -150,20 +162,20 @@ function doGet(e) {
 
     var date = Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd');
     shipments.push({ id: 'S' + Date.now(), items: newItems, tracking: tracking, note: note, date: date });
-    sheet.getRange(row, 13).setValue(JSON.stringify(shipments));
+    sheet.getRange(row, shipmentsCol).setValue(JSON.stringify(shipments));
 
     // 自动推进整单状态：全部商品发货完 → Shipped
     try {
-      var itemsData = sheet.getRange(row, 11).getValue();
+      var itemsData = sheet.getRange(row, shipColumns['Items Data']).getValue();
       var allItems = itemsData ? JSON.parse(itemsData) : [];
       var shippedSet = {};
       shipments.forEach(function(s) { (s.items || []).forEach(function(x) { shippedSet[x] = true; }); });
       if (Array.isArray(allItems) && allItems.length > 0 && Object.keys(shippedSet).length >= allItems.length) {
-        sheet.getRange(row, 10).setValue('Shipped');
+        sheet.getRange(row, shipColumns['Status']).setValue('Shipped');
       }
     } catch(e) {}
 
-    return json({ success: true, shipments: shipments, status: sheet.getRange(row, 10).getValue() });
+    return json({ success: true, shipments: shipments, status: sheet.getRange(row, shipColumns['Status']).getValue() });
   }
 
   if (action === 'unship') {
@@ -171,7 +183,8 @@ function doGet(e) {
     var itemsParam = e.parameter.items || '';
     if (!row || !itemsParam) return json({ error: 'Missing row or items' });
     var items = itemsParam.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
-    var cellVal = sheet.getRange(row, 13).getValue();
+    var unshipCol = ensureOrderColumns(sheet, ['Shipments'])['Shipments'];
+    var cellVal = sheet.getRange(row, unshipCol).getValue();
     var shipments = [];
     if (cellVal) {
       try { shipments = JSON.parse(cellVal); } catch(e) { shipments = []; }
@@ -183,7 +196,7 @@ function doGet(e) {
       s.items = (s.items || []).filter(function(x) { return !removeSet[x]; });
       return s;
     }).filter(function(s) { return s.items && s.items.length > 0; });
-    sheet.getRange(row, 13).setValue(JSON.stringify(shipments));
+    sheet.getRange(row, unshipCol).setValue(JSON.stringify(shipments));
     return json({ success: true, shipments: shipments });
   }
 
@@ -202,25 +215,24 @@ function doPost(e) {
 
     if (!sheet) {
       sheet = ss.insertSheet('Orders');
-      sheet.appendRow(['Order ID', 'Date (ET)', 'Customer Name', 'Email', 'Phone', 'Shipping Address', 'Items', 'Total', 'Notes', 'Status', 'Items Data', 'Admin Note']);
+      sheet.appendRow(['Order ID', 'Date (ET)', 'Customer Name', 'Email', 'Phone', 'Shipping Address', 'Items', 'Total', 'Notes', 'Status', 'Items Data', 'Admin Note', 'Shipments', 'Order Type', 'Related Order ID', 'Compensation Reason', 'Reference Total', 'Complimentary Total']);
       sheet.setFrozenRows(1);
-      sheet.getRange(1, 1, 1, 12).setFontWeight('bold').setBackground('#f0f0f0');
+      sheet.getRange(1, 1, 1, 18).setFontWeight('bold').setBackground('#f0f0f0');
     }
 
-    // 确保有 Items Data 和 Admin Note 列
-    var lastCol = sheet.getLastColumn();
-    if (lastCol < 11) {
-      sheet.getRange(1, 11).setValue('Items Data');
-      sheet.getRange(1, 11).setFontWeight('bold').setBackground('#f0f0f0');
-    }
-    if (lastCol < 12) {
-      sheet.getRange(1, 12).setValue('Admin Note');
-      sheet.getRange(1, 12).setFontWeight('bold').setBackground('#f0f0f0');
-    }
+    var columns = ensureOrderColumns(sheet, [
+      'Order ID', 'Date (ET)', 'Customer Name', 'Email', 'Phone', 'Shipping Address',
+      'Items', 'Total', 'Notes', 'Status', 'Items Data', 'Admin Note', 'Shipments',
+      'Order Type', 'Related Order ID', 'Compensation Reason', 'Reference Total', 'Complimentary Total'
+    ]);
 
     var itemsStr = data.items.map(function(i) {
       var v = Object.values(i.variants || {}).join(', ');
-      return i.name + ' (' + v + ') x' + i.quantity + ' - $' + i.subtotal.toFixed(2);
+      var lineTotal = Number(i.subtotal) || 0;
+      var billingType = i.billingType || 'Regular';
+      if (billingType === 'Compensation') return i.name + ' (' + v + ') x' + i.quantity + ' - Compensation / No charge (ref. $' + lineTotal.toFixed(2) + ')';
+      if (billingType === 'Gift') return i.name + ' (' + v + ') x' + i.quantity + ' - Gift / No charge (ref. $' + lineTotal.toFixed(2) + ')';
+      return i.name + ' (' + v + ') x' + i.quantity + ' - $' + lineTotal.toFixed(2);
     }).join('\n');
 
     var addrParts = [data.customer.address, data.customer.apt, data.customer.city + ', ' + data.customer.state + ' ' + data.customer.zip].filter(Boolean);
@@ -229,19 +241,24 @@ function doPost(e) {
     // 完整 items JSON 存入第 11 列
     var itemsData = JSON.stringify(data.items);
 
-    sheet.appendRow([
-      data.orderId,
-      data.date,
-      data.customer.name,
-      data.customer.email || '',
-      data.customer.phone || '',
-      addr,
-      itemsStr,
-      data.total.toFixed(2),
-      data.notes || '',
-      'New',
-      itemsData
-    ]);
+    var row = new Array(sheet.getLastColumn()).fill('');
+    row[columns['Order ID'] - 1] = data.orderId;
+    row[columns['Date (ET)'] - 1] = data.date;
+    row[columns['Customer Name'] - 1] = data.customer.name;
+    row[columns['Email'] - 1] = data.customer.email || '';
+    row[columns['Phone'] - 1] = data.customer.phone || '';
+    row[columns['Shipping Address'] - 1] = addr;
+    row[columns['Items'] - 1] = itemsStr;
+    row[columns['Total'] - 1] = (Number(data.total) || 0).toFixed(2);
+    row[columns['Notes'] - 1] = data.notes || '';
+    row[columns['Status'] - 1] = 'New';
+    row[columns['Items Data'] - 1] = itemsData;
+    row[columns['Order Type'] - 1] = data.orderType || 'Standard';
+    row[columns['Related Order ID'] - 1] = data.relatedOrderId || '';
+    row[columns['Compensation Reason'] - 1] = data.compensationReason || '';
+    row[columns['Reference Total'] - 1] = (Number(data.referenceTotal) || Number(data.total) || 0).toFixed(2);
+    row[columns['Complimentary Total'] - 1] = (Number(data.complimentaryTotal) || 0).toFixed(2);
+    sheet.appendRow(row);
 
     sheet.autoResizeColumns(1, 12);
     return json({ success: true, orderId: data.orderId });
