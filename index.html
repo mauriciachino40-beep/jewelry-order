@@ -1246,6 +1246,9 @@
       let migrated = false;
       cart.forEach(item => {
         if (!item.billingType) { item.billingType = 'Regular'; migrated = true; }
+        if (!canCreateComplimentaryItems() && item.billingType !== 'Regular') {
+          item.billingType = 'Regular'; item.relatedOrderId = ''; item.compensationReason = ''; item.giftNote = ''; migrated = true;
+        }
         for (const k in item.variants) {
           if (COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
           if (k === 'Size' && /^\d+$/.test(item.variants[k])) { item.variants[k] = item.variants[k] + 'cm'; migrated = true; }
@@ -1485,6 +1488,7 @@
     function getCartComplimentaryTotal() { return getCartReferenceTotal() - getCartTotal(); }
     function getCartCount() { return cart.reduce((s, i) => s + i.quantity, 0); }
     function getItemBillingType(item) { return item.billingType || 'Regular'; }
+    function canCreateComplimentaryItems() { return String(currentUser || '').trim().toLowerCase() === 'kiki'; }
     function getBillingLabel(type) {
       if (type === 'Compensation') return '↩️ Compensation — No charge';
       if (type === 'Gift') return '🎁 Gift — No charge';
@@ -1496,6 +1500,7 @@
       return `<span style="display:inline-block;margin-top:5px;padding:3px 8px;border-radius:12px;background:#fff8e8;border:1px solid #f1d28b;color:#805b12;font-size:11px;font-weight:700;">${getBillingLabel(type)}</span>`;
     }
     function updateCartItemBillingType(cartItemId, type) {
+      if (!canCreateComplimentaryItems()) { showToast('Only Kiki can create complimentary items'); return; }
       const item = cart.find(i => i.cartItemId === cartItemId);
       if (!item) return;
       item.billingType = type;
@@ -1504,6 +1509,7 @@
       saveCart(); updateCartUI();
     }
     function updateCartItemBillingDetail(cartItemId, field, value) {
+      if (!canCreateComplimentaryItems()) return;
       const item = cart.find(i => i.cartItemId === cartItemId);
       if (!item) return;
       item[field] = value;
@@ -1583,12 +1589,12 @@
           return ai - bi;
         });
         const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
-        const billingType = getItemBillingType(item);
-        const billingDetails = billingType === 'Compensation' ? `
+        const billingType = canCreateComplimentaryItems() ? getItemBillingType(item) : 'Regular';
+        const billingDetails = canCreateComplimentaryItems() && billingType === 'Compensation' ? `
           <div style="margin-top:8px;padding:8px;background:#fff8e8;border-radius:8px;border:1px solid #f1d28b;">
             <input class="form-input" value="${escStr(item.relatedOrderId || '')}" placeholder="Original order ID *" onchange="updateCartItemBillingDetail(${item.cartItemId}, 'relatedOrderId', this.value)" style="margin-bottom:6px;padding:8px 10px;font-size:12px;">
             <input class="form-input" value="${escStr(item.compensationReason || '')}" placeholder="Compensation reason *" onchange="updateCartItemBillingDetail(${item.cartItemId}, 'compensationReason', this.value)" style="padding:8px 10px;font-size:12px;">
-          </div>` : billingType === 'Gift' ? `
+          </div>` : canCreateComplimentaryItems() && billingType === 'Gift' ? `
           <div style="margin-top:8px;padding:8px;background:#fff8e8;border-radius:8px;border:1px solid #f1d28b;">
             <input class="form-input" value="${escStr(item.giftNote || '')}" placeholder="Gift note (optional)" onchange="updateCartItemBillingDetail(${item.cartItemId}, 'giftNote', this.value)" style="padding:8px 10px;font-size:12px;">
           </div>` : '';
@@ -1599,15 +1605,15 @@
               <div class="cart-item-name">${item.name}</div>
               <div class="cart-item-variants">${vt}</div>
               <div class="cart-item-price">${billingType === 'Regular' ? `$${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)}` : `Reference: $${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)} · $0 due`}</div>
-              <div style="margin-top:7px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              ${canCreateComplimentaryItems() ? `<div style="margin-top:7px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <span style="font-size:11px;color:var(--text-light);font-weight:600;">Charge:</span>
                 <select class="admin-status-select" onchange="updateCartItemBillingType(${item.cartItemId}, this.value)" style="font-size:11px;">
                   <option value="Regular"${billingType === 'Regular' ? ' selected' : ''}>Regular order</option>
                   <option value="Compensation"${billingType === 'Compensation' ? ' selected' : ''}>Compensation / replacement</option>
                   <option value="Gift"${billingType === 'Gift' ? ' selected' : ''}>Gift</option>
                 </select>
-              </div>
-              ${getBillingBadgeHTML(item)}
+              </div>` : ''}
+              ${canCreateComplimentaryItems() ? getBillingBadgeHTML(item) : ''}
               ${billingDetails}
               <div class="cart-item-actions">
                 <div class="cart-item-qty">
@@ -1782,7 +1788,7 @@
       if (!name) { showToast('⚠️ Please enter your name'); return false; }
       const email = document.getElementById('inputEmail').value.trim();
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('⚠️ Please enter a valid email'); return false; }
-      const incompleteCompensation = cart.find(item => getItemBillingType(item) === 'Compensation' && (!String(item.relatedOrderId || '').trim() || !String(item.compensationReason || '').trim()));
+      const incompleteCompensation = canCreateComplimentaryItems() && cart.find(item => getItemBillingType(item) === 'Compensation' && (!String(item.relatedOrderId || '').trim() || !String(item.compensationReason || '').trim()));
       if (incompleteCompensation) { showToast('⚠️ Each compensation item needs the original order ID and reason'); return false; }
       return true;
     }
@@ -1796,8 +1802,9 @@
       const referenceTotal = getCartReferenceTotal();
       const total = getCartTotal();
       const complimentaryTotal = getCartComplimentaryTotal();
-      const compensationItems = cart.filter(item => getItemBillingType(item) === 'Compensation');
-      const giftItems = cart.filter(item => getItemBillingType(item) === 'Gift');
+      const itemBillingType = item => canCreateComplimentaryItems() ? getItemBillingType(item) : 'Regular';
+      const compensationItems = cart.filter(item => itemBillingType(item) === 'Compensation');
+      const giftItems = cart.filter(item => itemBillingType(item) === 'Gift');
       const orderType = compensationItems.length && giftItems.length ? 'Mixed — Compensation + Gift' : compensationItems.length ? (cart.length === compensationItems.length ? 'Compensation' : 'Mixed — Compensation') : giftItems.length ? (cart.length === giftItems.length ? 'Gift' : 'Mixed — Gift') : 'Standard';
       const orderData = {
         orderId,
@@ -1814,9 +1821,9 @@
         },
         items: cart.map(i => ({
           name: i.name, image: i.image, variants: i.variants, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity,
-          billingType: getItemBillingType(i),
-          billableSubtotal: getItemBillingType(i) === 'Regular' ? i.price * i.quantity : 0,
-          relatedOrderId: i.relatedOrderId || '', compensationReason: i.compensationReason || '', giftNote: i.giftNote || ''
+          billingType: itemBillingType(i),
+          billableSubtotal: itemBillingType(i) === 'Regular' ? i.price * i.quantity : 0,
+          relatedOrderId: itemBillingType(i) === 'Compensation' ? (i.relatedOrderId || '') : '', compensationReason: itemBillingType(i) === 'Compensation' ? (i.compensationReason || '') : '', giftNote: itemBillingType(i) === 'Gift' ? (i.giftNote || '') : ''
         })),
         total,
         referenceTotal,
