@@ -1135,7 +1135,14 @@
         id: 'cp1',
         name: 'LOVE pendant, 2 diamonds',
         price: 30.00,
-        image: './love-pendant-placeholder.svg',
+        image: './cp1-white-diamond.webp',
+        imageByVariant: {
+          name: 'Diamond',
+          images: {
+            'White': './cp1-white-diamond.webp',
+            'Pink': './cp1-pink-diamond.jpg'
+          }
+        },
         category: 'Carti Collection',
         variants: [
           { name: 'Style', options: ['Bracelet', 'Necklace'] },
@@ -1262,14 +1269,15 @@
           item.billingType = 'Regular'; item.relatedOrderId = ''; item.compensationReason = ''; item.giftNote = ''; migrated = true;
         }
         for (const k in item.variants) {
-          if (COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
+          if (item.productId !== 'cp1' && COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
           if (k === 'Size' && /^\d+$/.test(item.variants[k])) { item.variants[k] = item.variants[k] + 'cm'; migrated = true; }
         }
       });
       if (migrated) saveCart();
     }
     function saveCart() { localStorage.setItem(getStorageKey('cart_v2'), JSON.stringify(cart)); }
-    function formatVariant(v) {
+    function formatVariant(v, productId) {
+      if (productId === 'cp1') return v;
       const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
       if (COLOR_MAP[v]) return COLOR_MAP[v];
       if (/^\d+$/.test(v)) return v + 'cm';
@@ -1293,8 +1301,13 @@
 
     function filterCategory(cat) { activeCategory = cat; renderCategoryTabs(); renderProducts(); }
 
-    // 根据选中的 Clover Size 决定展示哪张图；未选时用默认图
+    // 根据选项决定展示哪张图；未选时用默认图
     function getProductImage(p) {
+      if (p.imageByVariant) {
+        const variantKey = `${p.id}-${p.imageByVariant.name}`;
+        const selected = selectedVariants[variantKey];
+        if (selected && p.imageByVariant.images[selected]) return p.imageByVariant.images[selected];
+      }
       if (p.sizeImages) {
         const sizeKey = `${p.id}-Clover Size`;
         const sel = selectedVariants[sizeKey];
@@ -1346,7 +1359,7 @@
 
         return `
           <div class="product-card">
-            <div class="product-image-wrap${p.sizeImages ? ' image-contain' : ''}">
+            <div class="product-image-wrap${p.sizeImages || p.imageByVariant ? ' image-contain' : ''}">
               <img src="${getProductImage(p)}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
               <div class="product-image-placeholder" style="display:none">🖼️<br>Replace Image</div>
             </div>
@@ -1600,7 +1613,7 @@
           if (bi === -1) return -1;
           return ai - bi;
         });
-        const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
+        const vt = keys.map(k => formatVariant(item.variants[k], item.productId)).join(', ');
         const billingType = canCreateComplimentaryItems() ? getItemBillingType(item) : 'Regular';
         const billingDetails = canCreateComplimentaryItems() && billingType === 'Compensation' ? `
           <div style="margin-top:8px;padding:8px;background:#fff8e8;border-radius:8px;border:1px solid #f1d28b;">
@@ -1764,7 +1777,7 @@
           if (bi === -1) return -1;
           return ai - bi;
         });
-        const vt = keys.map(k => formatVariant(item.variants[k])).join(', ');
+        const vt = keys.map(k => formatVariant(item.variants[k], item.productId)).join(', ');
         const billingType = getItemBillingType(item);
         const detail = billingType === 'Compensation'
           ? `Original order: ${escStr(item.relatedOrderId || 'Not set')}<br>Reason: ${escStr(item.compensationReason || 'Not set')}`
@@ -1896,7 +1909,7 @@
         return ai - bi;
       });
       const itemsRows = data.items.map((it, i) => {
-        const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k])).join(', ');
+        const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k], it.productId)).join(', ');
         return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal, billingType: it.billingType || 'Regular', relatedOrderId: it.relatedOrderId || '', compensationReason: it.compensationReason || '', giftNote: it.giftNote || '' };
       });
 
@@ -2045,7 +2058,7 @@
         return ai - bi;
       });
       const itemsRows = data.items.map((it, i) => {
-        const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k])).join(', ');
+        const vt = sortKeys(Object.keys(it.variants)).map(k => formatVariant(it.variants[k], it.productId)).join(', ');
         return { num: i+1, image: it.image, name: it.name, variants: vt, qty: it.quantity, price: it.price, subtotal: it.subtotal, billingType: it.billingType || 'Regular', relatedOrderId: it.relatedOrderId || '', compensationReason: it.compensationReason || '', giftNote: it.giftNote || '' };
       });
       const itemsListHTML = itemsRows.map(r => `
@@ -2649,7 +2662,7 @@
       }
 
       var rowsHTML = items.map(function(it, n) {
-        var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k]); }).join(', ');
+        var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k], it.productId); }).join(', ');
         var shipped = shippedMap[n];
         var leftHTML = shipped
           ? '<span style="color:#5b8c5a;font-weight:700;font-size:12px;">✓ Shipped</span>'
@@ -2794,7 +2807,7 @@
         } else {
           itemsHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:20px;">' +
             items.map(function(it, n) {
-              var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k]); }).join(', ');
+              var vt = sortKeys(Object.keys(it.variants || {})).map(function(k) { return formatVariant(it.variants[k], it.productId); }).join(', ');
               return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #ddd;min-width:0;">' +
                 (it.image ? '<img src="' + it.image + '" alt="' + it.name + '" style="width:48px;height:48px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f2f2f2;" onerror="this.style.display=\'none\'">' : '') +
                 '<div style="flex:1;min-width:0;">' +
