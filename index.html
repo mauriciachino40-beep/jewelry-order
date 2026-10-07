@@ -1150,6 +1150,18 @@
           { name: 'Color', options: ['RG', 'WG', 'YG'] }
         ]
       },
+      {
+        id: 'cp2',
+        name: 'LOVE pendant',
+        price: 30.00,
+        image: './love-pendant-placeholder.svg',
+        category: 'Carti Collection',
+        variants: [
+          { name: 'Diamond Setting', options: ['Plain', 'Half Pavé', 'Full Pavé'] },
+          { name: 'Style', options: ['Necklace', 'Bracelet'] },
+          { name: 'Color', options: ['WG', 'YG', 'RG'] }
+        ]
+      },
 
       // =====================================================
       // 📿 LOVE BANGLE — 选项：Color + Width + Size
@@ -1269,7 +1281,7 @@
           item.billingType = 'Regular'; item.relatedOrderId = ''; item.compensationReason = ''; item.giftNote = ''; migrated = true;
         }
         for (const k in item.variants) {
-          if (item.productId !== 'cp1' && COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
+          if (!['cp1', 'cp2'].includes(item.productId) && COLOR_MAP[item.variants[k]]) { item.variants[k] = COLOR_MAP[item.variants[k]]; migrated = true; }
           if (k === 'Size' && /^\d+$/.test(item.variants[k])) { item.variants[k] = item.variants[k] + 'cm'; migrated = true; }
         }
       });
@@ -1277,7 +1289,7 @@
     }
     function saveCart() { localStorage.setItem(getStorageKey('cart_v2'), JSON.stringify(cart)); }
     function formatVariant(v, productId) {
-      if (productId === 'cp1') return v;
+      if (['cp1', 'cp2'].includes(productId)) return v;
       const COLOR_MAP = { 'YG': 'Yellow Gold', 'WG': 'White Gold', 'RG': 'Rose Gold' };
       if (COLOR_MAP[v]) return COLOR_MAP[v];
       if (/^\d+$/.test(v)) return v + 'cm';
