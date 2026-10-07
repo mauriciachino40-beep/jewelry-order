@@ -1177,32 +1177,25 @@
       // 📿 LOVE BANGLE — 选项：Color + Width + Size
       // =====================================================
       {
-        id: 'lb1',
-        name: 'Love Bangle (Without Sparkle)',
-        price: 28.50,
-        image: './lb1.jpg',
-        category: 'Love Bangle',
-        variants: [
-          { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] },
-          { name: 'Width', options: ['Slim', 'Thick'] },
-          { name: 'Size', options: ['16cm', '17cm', '18cm', '19cm'] }
-        ]
-      },
-      {
         id: 'lb2',
         name: 'Love Bangle (With Sparkles)',
         price: 28.50,
         image: './lb2.jpg',
         category: 'Love Bangle',
+        imageByVariant: {
+          name: 'Sparkles',
+          images: { 'No Sparkles': './lb1.jpg' }
+        },
         variants: [
           { name: 'Width', options: ['Slim', 'Thick'] },
-          { name: 'Sparkles', options: ['4 Diamonds', '6 Diamonds', '10 Diamonds'], dependsOn: 'Width', conditionalOptions: { 'Slim': ['6 Diamonds'], 'Thick': ['4 Diamonds', '10 Diamonds'] } },
+          { name: 'Sparkles', options: ['No Sparkles', '4 Diamonds', '6 Diamonds', '10 Diamonds'], dependsOn: 'Width', conditionalOptions: { 'Slim': ['No Sparkles', '6 Diamonds'], 'Thick': ['No Sparkles', '4 Diamonds', '10 Diamonds'] } },
           { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] },
           { name: 'Size', options: ['16cm', '17cm', '18cm', '19cm'] }
         ],
         priceByVariant: {
           name: 'Sparkles',
           pricing: {
+            'No Sparkles': 28.50,
             '4 Diamonds': 28.50,
             '6 Diamonds': 28.50,
             '10 Diamonds': 28.50
