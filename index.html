@@ -1892,6 +1892,12 @@
       // 保存到本地订单历史
       saveOrderToHistory(orderData);
 
+      // 订单已生成，立即清空当前购物车，避免同一批商品被重复提交。
+      // 确认页继续使用 orderData，因此打印、复制和分享不受影响。
+      cart = [];
+      saveCart();
+      updateCartUI();
+
       // 发送订单到 Google Sheets（你的后台）
       try {
         const sent = navigator.sendBeacon(
