@@ -1071,9 +1071,16 @@
           'Medium': './cn1-medium.png',
           'Magic pendant': './cn1-magic.png'
         },
+        imageByVariant: {
+          name: 'Stone',
+          images: {
+            'New Blue Butterfly': './cn1-new-butterflies.jpg',
+            'New Pink Butterfly': './cn1-new-butterflies.jpg'
+          }
+        },
         variants: [
           { name: 'Clover Size', options: ['Mini', 'Medium', 'Magic pendant'] },
-          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart', 'ladybug'], dependsOn: 'Clover Size', conditionalOptions: { 'Mini': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart'], 'Medium': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug'], 'Magic pendant': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug'] } },
+          { name: 'Stone', options: ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart', 'ladybug', 'New Blue Butterfly', 'New Pink Butterfly'], dependsOn: 'Clover Size', conditionalOptions: { 'Mini': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'mini mop butterfly', 'mini turquoise butterfly', 'mini heart', 'New Blue Butterfly', 'New Pink Butterfly'], 'Medium': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug', 'New Blue Butterfly', 'New Pink Butterfly'], 'Magic pendant': ['Red', 'Black', 'White MOP', 'Grey MOP', 'Pink MOP', 'Malachite', 'Laser Cut', 'Tiger Eye', 'Darker Blue', 'Turquoise', 'All Diamonds', 'ladybug', 'New Blue Butterfly', 'New Pink Butterfly'] } },
           { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] }
         ]
       },
