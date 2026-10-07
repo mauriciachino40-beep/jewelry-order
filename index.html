@@ -1156,6 +1156,14 @@
         price: 30.00,
         image: './love-pendant-placeholder.svg',
         category: 'Carti Collection',
+        imageByVariants: [
+          { variants: { 'Diamond Setting': 'Full Pavé', 'Style': 'Necklace', 'Color': 'YG', 'Diamond': 'White' }, image: './cp2-necklace-full-pave-yg-white.png' },
+          { variants: { 'Diamond Setting': 'Half Pavé', 'Style': 'Necklace', 'Color': 'YG', 'Diamond': 'White' }, image: './cp2-necklace-half-pave-yg-white.png' },
+          { variants: { 'Diamond Setting': 'Half Pavé', 'Style': 'Necklace', 'Color': 'RG', 'Diamond': 'Pink' }, image: './cp2-necklace-half-pave-rg-pink.jpg' },
+          { variants: { 'Diamond Setting': 'Full Pavé', 'Style': 'Bracelet', 'Color': 'RG', 'Diamond': 'White' }, image: './cp2-bracelet-full-pave-rg-white.png' },
+          { variants: { 'Diamond Setting': 'Full Pavé', 'Style': 'Bracelet', 'Color': 'YG', 'Diamond': 'White' }, image: './cp2-bracelet-full-pave-yg-white.png' },
+          { variants: { 'Diamond Setting': 'Full Pavé', 'Style': 'Bracelet', 'Color': 'WG', 'Diamond': 'White' }, image: './cp2-bracelet-full-pave-wg-white.png' }
+        ],
         variants: [
           { name: 'Diamond Setting', options: ['Plain', 'Half Pavé', 'Full Pavé'] },
           { name: 'Style', options: ['Necklace', 'Bracelet'] },
@@ -1316,6 +1324,14 @@
 
     // 根据选项决定展示哪张图；未选时用默认图
     function getProductImage(p) {
+      if (p.imageByVariants) {
+        const match = p.imageByVariants.find(entry =>
+          Object.entries(entry.variants).every(([variantName, option]) =>
+            selectedVariants[`${p.id}-${variantName}`] === option
+          )
+        );
+        if (match) return match.image;
+      }
       if (p.imageByVariant) {
         const variantKey = `${p.id}-${p.imageByVariant.name}`;
         const selected = selectedVariants[variantKey];
@@ -1372,7 +1388,7 @@
 
         return `
           <div class="product-card">
-            <div class="product-image-wrap${p.sizeImages || p.imageByVariant ? ' image-contain' : ''}">
+            <div class="product-image-wrap${p.sizeImages || p.imageByVariant || p.imageByVariants ? ' image-contain' : ''}">
               <img src="${getProductImage(p)}" alt="${p.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
               <div class="product-image-placeholder" style="display:none">🖼️<br>Replace Image</div>
             </div>
