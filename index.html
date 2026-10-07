@@ -1100,27 +1100,21 @@
       // 📿 NAIL BANGLE — 选项：Color + Width + Size
       // =====================================================
       {
-        id: 'nb1',
-        name: 'Nail Bangle (Without Sparkle)',
+        id: 'nb2',
+        name: 'Nail Bangle',
         price: 41.80,
         image: './nb1.jpg',
         category: 'Nail Bangle',
+        imageByVariant: {
+          name: 'Diamond Detail',
+          images: { 'With Sparkles on Nail & Head': './nb2.jpg' }
+        },
         variants: [
           { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold', 'Light YG'] },
           { name: 'Width', options: ['Slim', 'Thick'] },
-          { name: 'Size', options: ['16cm', '17cm', '18cm', '19cm'] }
-        ]
-      },
-      {
-        id: 'nb2',
-        name: 'Nail Bangle (With Sparkles on Nail & Head)',
-        price: 41.80,
-        image: './nb2.jpg',
-        category: 'Nail Bangle',
-        variants: [
-          { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold', 'Light YG'] },
-          { name: 'Width', options: ['Slim', 'Thick'] },
-          { name: 'Size', options: ['16cm', '17cm', '18cm', '19cm'] }
+          { name: 'Size', options: ['16cm', '17cm', '18cm', '19cm'] },
+          { name: 'Diamond Detail', options: ['Plain', 'With Sparkles on Nail & Head'] },
+          { name: 'Diamond Color', options: ['White', 'Pink'], dependsOn: 'Diamond Detail', conditionalOptions: { 'Plain': [], 'With Sparkles on Nail & Head': ['White', 'Pink'] } }
         ]
       },
 
@@ -1357,10 +1351,11 @@
           if (v.conditionalOptions && v.dependsOn) {
             const depKey = `${p.id}-${v.dependsOn}`;
             const depVal = selectedVariants[depKey];
-            if (depVal && v.conditionalOptions[depVal]) {
+            if (depVal && Object.prototype.hasOwnProperty.call(v.conditionalOptions, depVal)) {
               availOpts = v.conditionalOptions[depVal];
             }
           }
+          if (availOpts.length === 0) return '';
           return `
           <div class="variant-group">
             <div class="variant-label">${v.name}</div>
@@ -1452,6 +1447,10 @@
       const result = {};
       let allSelected = true;
       product.variants.forEach(v => {
+        if (v.conditionalOptions && v.dependsOn) {
+          const depVal = selectedVariants[`${productId}-${v.dependsOn}`];
+          if (depVal && Object.prototype.hasOwnProperty.call(v.conditionalOptions, depVal) && v.conditionalOptions[depVal].length === 0) return;
+        }
         const key = `${productId}-${v.name}`;
         if (selectedVariants[key]) {
           result[v.name] = selectedVariants[key];
