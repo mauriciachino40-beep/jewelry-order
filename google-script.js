@@ -1,4 +1,50 @@
-var PASSWORD = 'jewelry2026';
+// Passwords are NOT stored in this file (this repo is public).
+// Set them in Apps Script: Project Settings → Script Properties:
+//   ADMIN_PASSWORD  — shared back-office password (orders, Summary)
+//   OWNER_PASSWORD  — owner-only password (also unlocks the profit page)
+function getRole(password) {
+  if (!password) return '';
+  var props = PropertiesService.getScriptProperties();
+  var owner = props.getProperty('OWNER_PASSWORD');
+  var admin = props.getProperty('ADMIN_PASSWORD');
+  if (owner && password === owner) return 'owner';
+  if (admin && password === admin) return 'admin';
+  return '';
+}
+
+function getOwnerSheet(name, headers) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f0f0f0');
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+// Upsert a key → value row; an empty value removes the row.
+function setKeyedValue(sheet, key, label, value) {
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === key) {
+      if (value === '') { sheet.deleteRow(i + 1); }
+      else { sheet.getRange(i + 1, 2, 1, 2).setValues([[label, value]]); }
+      return;
+    }
+  }
+  if (value !== '') sheet.appendRow([key, label, value]);
+}
+
+function readKeyedValues(sheet) {
+  var data = sheet.getDataRange().getValues();
+  var out = {};
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] !== '' && data[i][2] !== '') out[String(data[i][0])] = Number(data[i][2]) || 0;
+  }
+  return out;
+}
 
 // Keep column references stable even when an existing Orders sheet was created
 // before a new order field was introduced.
@@ -35,12 +81,51 @@ function doGet(e) {
   if (!e || !e.parameter) {
     return json({ status: 'ok', message: 'Jewelry Order API' });
   }
-  var password = e.parameter.password;
-  if (password !== PASSWORD) {
-    return json({ error: 'Wrong password' });
-  }
   var action = e.parameter.action;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // ===== Public: a customer looks up shipments of ONE order (no addresses / other orders) =====
+  if (action === 'track') {
+    var orderId = String(e.parameter.orderId || '').trim();
+    var oSheet = ss.getSheetByName('Orders');
+    if (!orderId || !oSheet) return json({ error: 'Order unavailable' });
+    var tCols = ensureOrderColumns(oSheet, ['Order ID', 'Shipments']);
+    var tData = oSheet.getDataRange().getValues();
+    for (var t = 1; t < tData.length; t++) {
+      if (String(tData[t][tCols['Order ID'] - 1]) === orderId) {
+        var tShips = [];
+        try { tShips = JSON.parse(tData[t][tCols['Shipments'] - 1] || '[]'); } catch (err) { tShips = []; }
+        if (!Array.isArray(tShips)) tShips = [];
+        return json({ shipments: tShips.map(function(sh) {
+          return { date: sh.date || '', tracking: sh.tracking || '', note: sh.note || '' };
+        }) });
+      }
+    }
+    return json({ error: 'Order unavailable' });
+  }
+
+  var role = getRole(e.parameter.password);
+  if (!role) {
+    return json({ error: 'Wrong password' });
+  }
+  if (action === 'role') {
+    return json({ role: role });
+  }
+
+  // ===== Owner only: item costs & package shipping costs (kept out of Lisa's view) =====
+  if (action === 'costs_get' || action === 'cost_set' || action === 'pkg_set') {
+    if (role !== 'owner') return json({ error: 'Owner password required' });
+    var itemSheet = getOwnerSheet('Owner Item Costs', ['Key', 'Item', 'Unit Cost']);
+    var pkgSheet = getOwnerSheet('Owner Package Costs', ['Package', 'Tracking', 'Shipping Cost']);
+    if (action === 'cost_set' || action === 'pkg_set') {
+      var key = String(e.parameter.key || '');
+      var raw = String(e.parameter.cost === undefined ? '' : e.parameter.cost).trim();
+      var val = raw === '' ? '' : parseFloat(raw);
+      if (!key || (val !== '' && (isNaN(val) || val < 0))) return json({ error: 'Invalid key or cost' });
+      setKeyedValue(action === 'cost_set' ? itemSheet : pkgSheet, key, String(e.parameter.label || ''), val);
+    }
+    return json({ items: readKeyedValues(itemSheet), packages: readKeyedValues(pkgSheet) });
+  }
 
   // ===== Lisa 转账记录（存 Payments 表）=====
   if (action === 'payments_list') {

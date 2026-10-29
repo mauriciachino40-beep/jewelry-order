@@ -503,6 +503,10 @@
     }
     .admin-header h2 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex: 1; }
     .admin-header-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    @media (max-width: 520px) {
+      .admin-header { flex-wrap: wrap; row-gap: 10px; }
+      .admin-header-actions { width: 100%; flex-wrap: wrap; }
+    }
     .admin-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
     .admin-loading { text-align: center; padding: 40px; color: var(--text-light); }
     .admin-order-card {
@@ -621,6 +625,32 @@
       border: none; border-radius: 25px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
     .pw-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+
+    /* ========== Owner profit modal ========== */
+    .profit-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+    .profit-tab { flex: 1; padding: 8px; border: 1.5px solid var(--border); background: var(--bg); border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .profit-tab.active { background: #2e7d32; border-color: #2e7d32; color: #fff; }
+    .profit-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+    .profit-total { background: #f5f7fa; border-radius: 10px; padding: 8px 6px; text-align: center; }
+    .profit-total-label { font-size: 11px; color: var(--text-light); }
+    .profit-total-value { font-size: 15px; font-weight: 700; margin-top: 2px; }
+    .profit-pos { color: #2e7d32; }
+    .profit-neg { color: var(--danger); }
+    .profit-warn { background: #fff3e0; color: #e65100; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin-bottom: 10px; }
+    .profit-month { margin: 16px 0 6px; font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; }
+    .profit-pkg { border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-bottom: 8px; font-size: 13px; }
+    .profit-pkg-head { display: flex; justify-content: space-between; gap: 8px; font-weight: 700; }
+    .profit-pkg-sub { font-size: 11px; color: var(--text-light); margin: 2px 0 6px; }
+    .profit-line { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; font-size: 12px; }
+    .profit-line-name { flex: 1; min-width: 0; }
+    .profit-line-nums { flex-shrink: 0; text-align: right; color: var(--text-light); }
+    .profit-missing { color: #e65100; font-weight: 700; }
+    .profit-ship-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+    .profit-input { width: 84px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+    .profit-pkg-foot { display: flex; justify-content: space-between; margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border); font-weight: 700; }
+    .profit-cost-product { border-bottom: 1px solid var(--border); padding: 10px 0; }
+    .profit-cost-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 13px; }
+    .profit-cost-row.variant { padding-left: 14px; font-size: 12px; color: var(--text-light); }
 
     /* ========== Summary (对账) Modal ========== */
     .summary-modal { display: none; position: fixed; inset: 0; z-index: 750; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; }
@@ -756,6 +786,8 @@
       <div class="admin-header-actions">
         <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
         <button class="admin-summary-btn" onclick="openSummary()">💰 Summary</button>
+        <button class="admin-summary-btn" id="profitBtn" onclick="openProfit()" style="display:none;background:#2e7d32;">📈 利润</button>
+        <button class="admin-refresh-btn" onclick="logoutAdmin()" title="Log out">🔒</button>
       </div>
     </div>
     <div class="admin-filter-tabs" id="adminFilterTabs" style="display:none;">
@@ -868,6 +900,18 @@
         <span style="width:34px;"></span>
       </div>
       <div class="summary-modal-body" id="summaryBody"></div>
+    </div>
+  </div>
+
+  <!-- ==================== OWNER PROFIT MODAL (owner password only) ==================== -->
+  <div class="summary-modal" id="profitModal">
+    <div class="summary-modal-content">
+      <div class="summary-modal-header">
+        <button class="checkout-back-btn" onclick="closeProfit()">←</button>
+        <h3>📈 包裹利润</h3>
+        <span style="width:34px;"></span>
+      </div>
+      <div class="summary-modal-body" id="profitBody"></div>
     </div>
   </div>
 
@@ -2229,7 +2273,13 @@
     // ============================================================
     // ADMIN
     // ============================================================
-    var ADMIN_PW = 'jewelry2026';
+    // Password is typed by whoever logs in and checked by the backend — never stored in this public page.
+    var adminPw = '';
+    var adminRole = '';
+    try {
+      adminPw = sessionStorage.getItem('adminPw') || '';
+      adminRole = sessionStorage.getItem('adminRole') || '';
+    } catch (e) {}
     var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbxcQ9zvwfOfaQzh6H_5hX5wh-YvJjhCreA7bpfr4bkxKC5dr57LKTDxj2UmPGoft7vVQg/exec';
     var brandTapCount = 0;
     var brandTapTimer = null;
@@ -2277,12 +2327,10 @@
     function loadOrderTracking(orderId) {
       const panel = document.getElementById('orderTrackingPanel');
       if (!panel) return;
-      fetchJsonRetry(ADMIN_URL + '?password=' + ADMIN_PW + '&action=list')
+      fetchJsonRetry(ADMIN_URL + '?action=track&orderId=' + encodeURIComponent(orderId))
         .then(function(data) {
-          const order = (data.orders || []).find(function(o) { return o['Order ID'] === orderId; });
-          if (!order) throw new Error('Order unavailable');
-          let shipments = [];
-          try { shipments = order['Shipments'] ? JSON.parse(order['Shipments']) : []; } catch(e) { shipments = []; }
+          if (!data || data.error) throw new Error('Order unavailable');
+          let shipments = Array.isArray(data.shipments) ? data.shipments : [];
           if (!Array.isArray(shipments) || shipments.length === 0) {
             panel.innerHTML = '<strong>📦 Shipment</strong><div style="margin-top:5px;">Not shipped yet.</div>';
             return;
@@ -2305,9 +2353,8 @@
       if (brandTapCount >= 3) {
         brandTapCount = 0;
         clearTimeout(brandTapTimer);
-        document.getElementById('adminPanel').classList.add('show');
-        document.body.style.overflow = 'hidden';
-        loadAdminOrders();
+        if (adminPw) openAdminPanel();
+        else openAdminLogin();
         return;
       }
       clearTimeout(brandTapTimer);
@@ -2323,14 +2370,37 @@
 
     function verifyPassword() {
       var pw = document.getElementById('pwInput').value;
-      if (pw === ADMIN_PW) {
-        document.getElementById('pwModal').classList.remove('show');
-        document.getElementById('adminPanel').classList.add('show');
-        document.body.style.overflow = 'hidden';
-        loadAdminOrders();
-      } else {
-        document.getElementById('pwError').textContent = 'Wrong password';
-      }
+      var err = document.getElementById('pwError');
+      if (!pw) { err.textContent = 'Enter the password'; return; }
+      err.textContent = 'Checking…';
+      fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(pw) + '&action=role')
+        .then(function(data) {
+          var role = data && data.role;
+          // Backend not yet upgraded: a correct password reaches "Unknown action".
+          if (!role && data && data.error === 'Unknown action') role = 'admin';
+          if (!role) { err.textContent = 'Wrong password'; return; }
+          adminPw = pw; adminRole = role;
+          try { sessionStorage.setItem('adminPw', pw); sessionStorage.setItem('adminRole', role); } catch (e) {}
+          err.textContent = '';
+          document.getElementById('pwModal').classList.remove('show');
+          openAdminPanel();
+        })
+        .catch(function() { err.textContent = 'Connection problem — try again'; });
+    }
+
+    function openAdminPanel() {
+      document.getElementById('profitBtn').style.display = adminRole === 'owner' ? '' : 'none';
+      document.getElementById('adminPanel').classList.add('show');
+      document.body.style.overflow = 'hidden';
+      loadAdminOrders();
+    }
+
+    function logoutAdmin() {
+      adminPw = ''; adminRole = '';
+      try { sessionStorage.removeItem('adminPw'); sessionStorage.removeItem('adminRole'); } catch (e) {}
+      closeProfit();
+      closeAdmin();
+      showToast('🔒 Logged out', 1500);
     }
 
     function closeAdmin() {
@@ -2343,7 +2413,7 @@
       body.innerHTML = '<div class="admin-loading">Loading orders...</div>';
       document.getElementById('adminFilterTabs').style.display = 'none';
 
-      fetchJsonRetry(ADMIN_URL + '?password=' + ADMIN_PW + '&action=list')
+      fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=list')
         .then(function(data) {
           if (data.error) {
             body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Error: ' + data.error + '</div>';
@@ -2379,7 +2449,7 @@
     function loadPaymentsAndRender() {
       var body = document.getElementById('summaryBody');
       body.innerHTML = '<div class="admin-loading">Loading payments…</div>';
-      fetchJsonRetry(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_list')
+      fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=payments_list')
         .then(function(data) {
           var payments = (data && Array.isArray(data.payments)) ? data.payments : null;
           renderSummary(payments);
@@ -2390,7 +2460,7 @@
       var amount = parseFloat(document.getElementById('payAmount').value);
       if (!amount || amount <= 0) { showToast('⚠️ Enter an amount first', 2000); return; }
       var date = document.getElementById('payDate').value || todayStr();
-      var url = ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_add&date=' + encodeURIComponent(date) + '&amount=' + amount;
+      var url = ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=payments_add&date=' + encodeURIComponent(date) + '&amount=' + amount;
       fetch(url).then(function(r) { return r.json(); }).then(function(data) {
         if (data.success) { showToast('✅ Payment recorded', 2000); loadPaymentsAndRender(); }
         else { showToast('❌ ' + (data.error || 'Save failed'), 3000); }
@@ -2398,7 +2468,7 @@
     }
     function deletePayment(row) {
       if (!confirm('Delete this payment record?')) return;
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=payments_delete&row=' + row)
+      fetch(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=payments_delete&row=' + row)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.success) { showToast('↩️ Deleted', 1500); loadPaymentsAndRender(); }
@@ -2496,6 +2566,208 @@
       }
 
       document.getElementById('summaryBody').innerHTML = html;
+    }
+
+    // ========== 包裹利润（仅 owner 密码可见；成本存在 Google 表格，不写进公开网页）==========
+    var profitCosts = { items: {}, packages: {} };
+    var profitTab = 'packages';
+
+    function money(n) { return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); }
+    function variantText(it) {
+      var order = ['Width', 'Color', 'Size'];
+      return Object.keys(it.variants || {}).sort(function(a, b) {
+        var ai = order.indexOf(a), bi = order.indexOf(b);
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || (a < b ? -1 : 1);
+      }).map(function(k) { return formatVariant(String(it.variants[k])); }).join(', ');
+    }
+    function productCostKey(it) { return 'P|' + String(it.name || '').trim(); }
+    function variantCostKey(it) { return 'V|' + String(it.name || '').trim() + '|' + variantText(it); }
+    function unitCostFor(it) {
+      var v = profitCosts.items[variantCostKey(it)];
+      if (v !== undefined) return v;
+      var p = profitCosts.items[productCostKey(it)];
+      return p !== undefined ? p : null;
+    }
+    function packageKey(sh) {
+      var t = String(sh.tracking || '').replace(/\s+/g, '').toUpperCase();
+      return t ? 'T|' + t : 'S|' + (sh.id || '');
+    }
+
+    function openProfit() {
+      if (adminRole !== 'owner') return;
+      document.getElementById('profitModal').classList.add('show');
+      var body = document.getElementById('profitBody');
+      body.innerHTML = '<div class="admin-loading">Loading costs…</div>';
+      fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=costs_get')
+        .then(function(data) {
+          if (!data || data.error) {
+            body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">⚠️ ' + escStr((data && data.error) || '读取失败') + '</div>';
+            return;
+          }
+          profitCosts = { items: data.items || {}, packages: data.packages || {} };
+          renderProfit();
+        })
+        .catch(function() {
+          body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">连接中断，请重试<div style="margin-top:12px"><button class="admin-refresh-btn" onclick="openProfit()">🔄 重试</button></div></div>';
+        });
+    }
+    function closeProfit() { document.getElementById('profitModal').classList.remove('show'); }
+    function setProfitTab(tab) { profitTab = tab; renderProfit(); }
+
+    // 把所有订单里的发货记录按物流单号合并成"包裹"（同一单号跨多个订单会合在一起）
+    function buildPackages() {
+      var map = {};
+      (window._adminOrders || []).forEach(function(o) {
+        var items = getStoredOrderItems(o);
+        var shipments = [];
+        try { shipments = o['Shipments'] ? JSON.parse(o['Shipments']) : []; } catch (e) { shipments = []; }
+        if (!Array.isArray(shipments)) return;
+        shipments.forEach(function(sh) {
+          var key = packageKey(sh);
+          var pkg = map[key] || (map[key] = { key: key, tracking: String(sh.tracking || '').trim(), date: '', orders: {}, lines: [] });
+          if (sh.date && (!pkg.date || sh.date < pkg.date)) pkg.date = sh.date;
+          pkg.orders[o['Order ID'] || ('row ' + o._row)] = o['Customer Name'] || '';
+          (sh.items || []).forEach(function(idx) {
+            var it = items[idx];
+            if (!it) return;
+            var qty = Number(it.quantity) || 0;
+            var regular = String(it.billingType || 'Regular') === 'Regular';
+            var income = regular ? (Number(it.billableSubtotal) || Number(it.subtotal) || (Number(it.price) || 0) * qty) : 0;
+            pkg.lines.push({ item: it, qty: qty, income: income, regular: regular });
+          });
+        });
+      });
+      return Object.keys(map).map(function(k) {
+        var pkg = map[k], cost = 0, missing = 0, income = 0;
+        pkg.lines.forEach(function(l) {
+          var u = unitCostFor(l.item);
+          l.unit = u;
+          if (u === null) missing++; else cost += u * l.qty;
+          income += l.income;
+        });
+        pkg.shipping = profitCosts.packages[pkg.key];
+        if (pkg.shipping === undefined) missing++; else cost += pkg.shipping;
+        pkg.income = income; pkg.cost = cost; pkg.missing = missing; pkg.profit = income - cost;
+        return pkg;
+      }).sort(function(a, b) { return (b.date || '') < (a.date || '') ? -1 : (b.date || '') > (a.date || '') ? 1 : 0; });
+    }
+
+    function renderProfit() {
+      var body = document.getElementById('profitBody');
+      if (!window._adminOrders) {
+        body.innerHTML = '<div class="admin-loading">⚠️ 订单还没加载，先点 Refresh 再打开。</div>';
+        return;
+      }
+      var html = '<div class="profit-tabs">' +
+        '<button class="profit-tab' + (profitTab === 'packages' ? ' active' : '') + '" onclick="setProfitTab(\'packages\')">📦 包裹利润</button>' +
+        '<button class="profit-tab' + (profitTab === 'costs' ? ' active' : '') + '" onclick="setProfitTab(\'costs\')">🏷 成本设置</button>' +
+      '</div>';
+      html += profitTab === 'costs' ? renderCostSettings() : renderPackageProfits();
+      var scroll = body.scrollTop;
+      body.innerHTML = html;
+      body.scrollTop = scroll;
+    }
+
+    function totalsHTML(list) {
+      var inc = 0, cost = 0;
+      list.forEach(function(p) { inc += p.income; cost += p.cost; });
+      var profit = inc - cost;
+      return '<div class="profit-totals">' +
+        '<div class="profit-total"><div class="profit-total-label">收入</div><div class="profit-total-value">' + money(inc) + '</div></div>' +
+        '<div class="profit-total"><div class="profit-total-label">成本</div><div class="profit-total-value">' + money(cost) + '</div></div>' +
+        '<div class="profit-total"><div class="profit-total-label">利润</div><div class="profit-total-value ' + (profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(profit) + '</div></div>' +
+      '</div>';
+    }
+
+    function renderPackageProfits() {
+      var pkgs = buildPackages();
+      if (pkgs.length === 0) return '<div class="admin-loading">还没有发货记录。</div>';
+      var html = totalsHTML(pkgs);
+      var incomplete = pkgs.filter(function(p) { return p.missing > 0; }).length;
+      if (incomplete) html += '<div class="profit-warn">⚠️ ' + incomplete + ' 个包裹还缺成本或运费，利润偏高。到「🏷 成本设置」填商品成本，在包裹里填运费。</div>';
+      html += '<div style="font-size:11px;color:var(--text-light);margin-bottom:4px;">收入只算正常收费的商品；赠品/补偿收入为 $0，但成本照算。</div>';
+
+      var lastMonth = '';
+      pkgs.forEach(function(p, n) {
+        var month = (p.date || '').slice(0, 7) || '无日期';
+        if (month !== lastMonth) {
+          lastMonth = month;
+          var inMonth = pkgs.filter(function(x) { return ((x.date || '').slice(0, 7) || '无日期') === month; });
+          var mProfit = inMonth.reduce(function(a, x) { return a + x.profit; }, 0);
+          html += '<div class="profit-month"><span>' + escStr(month) + ' · ' + inMonth.length + ' 个包裹</span><span class="' + (mProfit < 0 ? 'profit-neg' : 'profit-pos') + '">利润 ' + money(mProfit) + '</span></div>';
+        }
+        var orderIds = Object.keys(p.orders);
+        var title = p.tracking
+          ? '<a href="' + trackingUrl(p.tracking) + '" target="_blank" rel="noopener noreferrer" style="color:#1f6feb;">' + escStr(p.tracking) + ' ↗</a>'
+          : '<span style="color:var(--text-light);">无单号</span>';
+        html += '<div class="profit-pkg">' +
+          '<div class="profit-pkg-head"><span>' + title + '</span><span>' + escStr(p.date || '') + '</span></div>' +
+          '<div class="profit-pkg-sub">' + orderIds.length + ' 个订单：' + orderIds.map(function(id) { return escStr(id) + (p.orders[id] ? '（' + escStr(p.orders[id]) + '）' : ''); }).join('、') + '</div>';
+        p.lines.forEach(function(l) {
+          var vt = variantText(l.item);
+          var costTxt = l.unit === null ? '<span class="profit-missing">成本未填</span>' : '成本 ' + money(l.unit * l.qty);
+          html += '<div class="profit-line"><span class="profit-line-name">' + escStr(l.item.name) + (vt ? ' · ' + escStr(vt) : '') + ' ×' + l.qty +
+            (l.regular ? '' : ' <span style="color:#805b12;">(' + escStr(getBillingLabel(l.item.billingType)) + ')</span>') + '</span>' +
+            '<span class="profit-line-nums">收入 ' + money(l.income) + '<br>' + costTxt + '</span></div>';
+        });
+        html += '<div class="profit-ship-row">🚚 运费 $<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" value="' + (p.shipping === undefined ? '' : p.shipping) + '"' +
+            ' data-key="' + escStr(p.key) + '" data-label="' + escStr(p.tracking || '无单号 ' + (p.date || '')) + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
+            (p.shipping === undefined ? '<span class="profit-missing">未填</span>' : '') + '</div>' +
+          '<div class="profit-pkg-foot"><span>收入 ' + money(p.income) + ' − 成本 ' + money(p.cost) + '</span><span class="' + (p.profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(p.profit) + (p.missing ? ' *' : '') + '</span></div>' +
+        '</div>';
+      });
+      return html;
+    }
+
+    function renderCostSettings() {
+      // 只列出已经发过货的商品（按商品名分组，每个规格可单独设置）
+      var products = {};
+      buildPackages().forEach(function(p) {
+        p.lines.forEach(function(l) {
+          var name = String(l.item.name || '').trim();
+          var prod = products[name] || (products[name] = { sample: l.item, variants: {} });
+          prod.variants[variantCostKey(l.item)] = { item: l.item, qty: (prod.variants[variantCostKey(l.item)] || { qty: 0 }).qty + l.qty };
+        });
+      });
+      var names = Object.keys(products).sort();
+      if (names.length === 0) return '<div class="admin-loading">还没有发货的商品。</div>';
+      var html = '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">填每件的成本价（美元）。所有规格成本一样就只填「默认」；某个规格不一样，再单独填那一行，会覆盖默认。改完点别处自动保存。</div>';
+      names.forEach(function(name) {
+        var prod = products[name];
+        var pKey = productCostKey(prod.sample);
+        html += '<div class="profit-cost-product">' + costRowHTML(pKey, name + '（默认）', '<strong>' + escStr(name) + '</strong> 默认', '');
+        Object.keys(prod.variants).sort().forEach(function(vKey) {
+          var v = prod.variants[vKey];
+          var vt = variantText(v.item) || '无规格';
+          html += costRowHTML(vKey, name + ' · ' + vt, escStr(vt) + ' <span style="font-size:11px;">（已发 ' + v.qty + ' 件）</span>', 'variant');
+        });
+        html += '</div>';
+      });
+      return html;
+    }
+
+    function costRowHTML(key, label, labelHTML, cls) {
+      var val = profitCosts.items[key];
+      return '<div class="profit-cost-row ' + cls + '"><span>' + labelHTML + '</span>' +
+        '<span>$<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + (cls ? '用默认' : '未填') + '" value="' + (val === undefined ? '' : val) + '"' +
+        ' data-key="' + escStr(key) + '" data-label="' + escStr(label) + '" onchange="saveProfitCost(\'cost_set\', this)"></span></div>';
+    }
+
+    function saveProfitCost(action, input) {
+      var key = input.getAttribute('data-key');
+      var raw = input.value.trim();
+      if (raw !== '' && (isNaN(parseFloat(raw)) || parseFloat(raw) < 0)) { showToast('⚠️ 请输入正数', 2000); return; }
+      var url = ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=' + action +
+        '&key=' + encodeURIComponent(key) + '&label=' + encodeURIComponent(input.getAttribute('data-label') || '') +
+        '&cost=' + encodeURIComponent(raw);
+      input.disabled = true;
+      fetchJsonRetry(url, 1).then(function(data) {
+        input.disabled = false;
+        if (!data || data.error) { showToast('❌ ' + ((data && data.error) || '保存失败'), 3000); return; }
+        profitCosts = { items: data.items || {}, packages: data.packages || {} };
+        showToast('✅ 已保存', 1200);
+        if (profitTab === 'packages') renderProfit();
+      }).catch(function() { input.disabled = false; showToast('❌ 网络中断，没保存', 3000); });
     }
 
     function renderAdminOrders(filterStatus) {
@@ -2665,7 +2937,7 @@
 
     function saveAdminNote(row, i) {
       var note = document.getElementById('adminNoteInput' + i).value;
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=note&row=' + row + '&note=' + encodeURIComponent(note))
+      fetch(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=note&row=' + row + '&note=' + encodeURIComponent(note))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.success) {
@@ -2792,7 +3064,10 @@
         '</div>' +
         '<div id="adminShipForm' + i + '" style="display:none;margin-top:8px;padding:10px;background:#f5f7fa;border-radius:6px;">' +
           '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">📦 填写发货信息（均可选）</div>' +
-          '<input id="adminShipTracking' + i + '" placeholder="单号 / Tracking" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:6px;box-sizing:border-box;">' +
+          '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
+            '<input id="adminShipTracking' + i + '" placeholder="单号 / Tracking" style="flex:1;min-width:0;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;">' +
+            '<button type="button" onclick="openTrackingFromInput(' + i + ')" style="flex-shrink:0;padding:7px 10px;border:none;border-radius:6px;background:#1f6feb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">🔍 查物流</button>' +
+          '</div>' +
           '<input id="adminShipNote' + i + '" placeholder="备注（如：第二包，周末寄）" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
           '<div style="display:flex;gap:6px;">' +
             '<button class="admin-note-save-btn" onclick="confirmShipItems(' + i + ')">✅ 确认发货</button>' +
@@ -2800,6 +3075,12 @@
           '</div>' +
         '</div>' +
       '</div>';
+    }
+
+    function openTrackingFromInput(i) {
+      var num = document.getElementById('adminShipTracking' + i).value.trim();
+      if (!num) { showToast('⚠️ 先输入单号', 2000); return; }
+      window.open(trackingUrl(num), '_blank', 'noopener');
     }
 
     function showShipForm(i) {
@@ -2819,7 +3100,7 @@
       if (!o) return;
       var tracking = document.getElementById('adminShipTracking' + i).value.trim();
       var note = document.getElementById('adminShipNote' + i).value.trim();
-      var url = ADMIN_URL + '?password=' + ADMIN_PW + '&action=ship&row=' + o._row + '&items=' + idxs.join(',') +
+      var url = ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=ship&row=' + o._row + '&items=' + idxs.join(',') +
         '&tracking=' + encodeURIComponent(tracking) + '&note=' + encodeURIComponent(note);
       fetch(url).then(function(r) { return r.json(); }).then(function(data) {
         if (data.success) {
@@ -2837,7 +3118,7 @@
 
     function unmarkShipItem(row, i, idx) {
       if (!confirm('取消这件商品的发货标记？')) return;
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=unship&row=' + row + '&items=' + idx)
+      fetch(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=unship&row=' + row + '&items=' + idx)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.success) {
@@ -2946,7 +3227,7 @@
     function deleteOrder(ev, row, i) {
       ev.stopPropagation();
       if (!confirm('Permanently delete order #' + (i + 1) + '? This cannot be undone.')) return;
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=delete&row=' + row)
+      fetch(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=delete&row=' + row)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.success) {
@@ -2971,7 +3252,7 @@
     }
 
     function updateOrderStatus(row, status, i) {
-      fetch(ADMIN_URL + '?password=' + ADMIN_PW + '&action=status&row=' + row + '&status=' + encodeURIComponent(status))
+      fetch(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=status&row=' + row + '&status=' + encodeURIComponent(status))
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.success) {
