@@ -2598,6 +2598,9 @@
     // 利润页全部用人民币：订单收入(美元) × 汇率；汇率存在 owner 表格里，默认 6.5
     var RATE_KEY = 'SETTING|USD_CNY';
     function usdToCny() { var r = Number(profitCosts.items[RATE_KEY]); return r > 0 ? r : 6.5; }
+    // 每个快递单号 = 一个包裹；没单独填运费的包裹按默认运费算（默认 ¥100，可改）
+    var SHIP_KEY = 'SETTING|DEFAULT_SHIP';
+    function defaultShip() { var v = profitCosts.items[SHIP_KEY]; return v !== undefined && Number(v) >= 0 ? Number(v) : 100; }
     function money(n) { return (n < 0 ? '-¥' : '¥') + Math.abs(n).toFixed(2); }
     function usd(n) { return '$' + (Number(n) || 0).toFixed(2); }
     function variantText(it) {
@@ -2680,8 +2683,9 @@
           if (u === null) missing++; else cost += u * l.qty;
           income += l.income;
         });
-        pkg.shipping = profitCosts.packages[pkg.key];
-        if (pkg.shipping === undefined) missing++; else cost += pkg.shipping;
+        pkg.shippingSet = profitCosts.packages[pkg.key] !== undefined;
+        pkg.shipping = pkg.shippingSet ? profitCosts.packages[pkg.key] : defaultShip();
+        cost += pkg.shipping;
         pkg.income = income; pkg.cost = cost; pkg.missing = missing; pkg.profit = income - cost;
         return pkg;
       }).sort(function(a, b) { return (b.date || '') < (a.date || '') ? -1 : (b.date || '') > (a.date || '') ? 1 : 0; });
@@ -2720,9 +2724,11 @@
       if (pkgs.length === 0) return '<div class="admin-loading">还没有发货记录。</div>';
       var html = '<div class="profit-ship-row" style="margin:0 0 10px;">💱 汇率 1 美元 = ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" value="' + usdToCny() + '"' +
         ' data-key="' + RATE_KEY + '" data-label="USD→CNY 汇率" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">订单美元收入按此换算</span></div>';
+      html += '<div class="profit-ship-row" style="margin:0 0 10px;">🚚 默认每包运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" value="' + defaultShip() + '"' +
+        ' data-key="' + SHIP_KEY + '" data-label="默认每包运费" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">每个快递单号算一个包裹</span></div>';
       html += totalsHTML(pkgs);
       var incomplete = pkgs.filter(function(p) { return p.missing > 0; }).length;
-      if (incomplete) html += '<div class="profit-warn">⚠️ ' + incomplete + ' 个包裹还缺成本或运费，利润偏高。到「🏷 成本设置」填商品成本，在包裹里填运费。</div>';
+      if (incomplete) html += '<div class="profit-warn">⚠️ ' + incomplete + ' 个包裹还有商品没填成本，利润偏高。到「🏷 成本设置」补上。</div>';
       html += '<div style="font-size:11px;color:var(--text-light);margin-bottom:4px;">全部以人民币计。收入只算正常收费的商品；赠品/补偿收入为 ¥0，但成本照算。</div>';
 
       var lastMonth = '';
@@ -2748,9 +2754,9 @@
             (l.regular ? '' : ' <span style="color:#805b12;">(' + escStr(getBillingLabel(l.item.billingType)) + ')</span>') + '</span>' +
             '<span class="profit-line-nums">收入 ' + money(l.income) + (l.incomeUsd ? ' <span style="font-size:10px;">(' + usd(l.incomeUsd) + ')</span>' : '') + '<br>' + costTxt + '</span></div>';
         });
-        html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" value="' + (p.shipping === undefined ? '' : p.shipping) + '"' +
+        html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + defaultShip() + '（默认）" value="' + (p.shippingSet ? p.shipping : '') + '"' +
             ' data-key="' + escStr(p.key) + '" data-label="' + escStr(p.tracking || '无单号 ' + (p.date || '')) + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
-            (p.shipping === undefined ? '<span class="profit-missing">未填</span>' : '') + '</div>' +
+            (p.shippingSet ? '' : '<span style="color:var(--text-light);">按默认，不同就改</span>') + '</div>' +
           '<div class="profit-pkg-foot"><span>收入 ' + money(p.income) + ' − 成本 ' + money(p.cost) + '</span><span class="' + (p.profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(p.profit) + (p.missing ? ' *' : '') + '</span></div>' +
         '</div>';
       });
@@ -2804,7 +2810,7 @@
         if (!data || data.error) { showToast('❌ ' + ((data && data.error) || '保存失败'), 3000); return; }
         profitCosts = { items: data.items || {}, packages: data.packages || {} };
         showToast('✅ 已保存', 1200);
-        if (profitTab === 'packages' || key === RATE_KEY) renderProfit();
+        if (profitTab === 'packages' || key === RATE_KEY || key === SHIP_KEY) renderProfit();
       }).catch(function() { input.disabled = false; showToast('❌ 网络中断，没保存', 3000); });
     }
 
