@@ -611,7 +611,7 @@
     .pw-modal.show { display: flex; }
     .pw-modal-content {
       background: #fff; border-radius: var(--radius); width: 100%; max-width: 340px;
-      overflow: hidden; box-shadow: var(--shadow-lg); padding: 24px; text-align: center;
+      overflow: hidden; box-shadow: var(--shadow-lg); padding: 24px; text-align: center; position: relative;
     }
     .pw-modal-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
     .pw-modal-subtitle { font-size: 13px; color: var(--text-light); margin-bottom: 16px; }
@@ -753,8 +753,9 @@
   <!-- ==================== ADMIN PASSWORD MODAL ==================== -->
   <div class="pw-modal" id="pwModal">
     <div class="pw-modal-content">
-      <div class="pw-modal-title">🔐 Admin Access</div>
-      <div class="pw-modal-subtitle">Enter password to view orders</div>
+      <div class="pw-modal-title">🔐</div>
+      <div class="pw-modal-subtitle">Enter password</div>
+      <button onclick="document.getElementById('pwModal').classList.remove('show')" style="position:absolute;top:10px;right:12px;border:none;background:none;font-size:20px;color:var(--text-light);cursor:pointer;">×</button>
       <input class="pw-input" id="pwInput" type="password" placeholder="Password" onkeydown="if(event.key==='Enter')verifyPassword()">
       <button class="pw-btn" onclick="verifyPassword()">Unlock</button>
       <div class="pw-error" id="pwError"></div>
@@ -782,12 +783,10 @@
   <div class="admin-panel" id="adminPanel">
     <div class="admin-header">
       <button class="checkout-back-btn" onclick="closeAdmin()">←</button>
-      <h2>📊 All Orders</h2>
+      <h2 onmousedown="ownerHoldStart(event)" onmouseup="ownerHoldEnd()" onmouseleave="ownerHoldEnd()" ontouchstart="ownerHoldStart(event)" ontouchend="ownerHoldEnd()" ontouchmove="ownerHoldEnd()" ontouchcancel="ownerHoldEnd()" oncontextmenu="return false" style="-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;">📊 All Orders</h2>
       <div class="admin-header-actions">
         <button class="admin-refresh-btn" onclick="loadAdminOrders()">🔄 Refresh</button>
         <button class="admin-summary-btn" onclick="openSummary()">💰 Summary</button>
-        <button class="admin-summary-btn" id="profitBtn" onclick="openProfit()" style="display:none;background:#2e7d32;">📈 利润</button>
-        <button class="admin-refresh-btn" onclick="logoutAdmin()" title="Log out">🔒</button>
       </div>
     </div>
     <div class="admin-filter-tabs" id="adminFilterTabs" style="display:none;">
@@ -2273,12 +2272,13 @@
     // ============================================================
     // ADMIN
     // ============================================================
-    // Password is typed by whoever logs in and checked by the backend — never stored in this public page.
+    // The back office opens with no password. Only the owner's hidden page uses a password,
+    // typed once per device and remembered there — it is never written into this public page.
     var adminPw = '';
-    var adminRole = '';
+    var adminRole = 'admin';
     try {
-      adminPw = sessionStorage.getItem('adminPw') || '';
-      adminRole = sessionStorage.getItem('adminRole') || '';
+      adminPw = localStorage.getItem('ownerKey') || '';
+      if (adminPw) adminRole = 'owner';
     } catch (e) {}
     var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbxcQ9zvwfOfaQzh6H_5hX5wh-YvJjhCreA7bpfr4bkxKC5dr57LKTDxj2UmPGoft7vVQg/exec';
     var brandTapCount = 0;
@@ -2353,15 +2353,14 @@
       if (brandTapCount >= 3) {
         brandTapCount = 0;
         clearTimeout(brandTapTimer);
-        if (adminPw) openAdminPanel();
-        else openAdminLogin();
+        openAdminPanel();
         return;
       }
       clearTimeout(brandTapTimer);
       brandTapTimer = setTimeout(function() { brandTapCount = 0; }, 1500);
     }
 
-    function openAdminLogin() {
+    function openOwnerLogin() {
       document.getElementById('pwInput').value = '';
       document.getElementById('pwError').textContent = '';
       document.getElementById('pwModal').classList.add('show');
@@ -2375,32 +2374,41 @@
       err.textContent = 'Checking…';
       fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(pw) + '&action=role')
         .then(function(data) {
-          var role = data && data.role;
-          // Backend not yet upgraded: a correct password reaches "Unknown action".
-          if (!role && data && data.error === 'Unknown action') role = 'admin';
-          if (!role) { err.textContent = 'Wrong password'; return; }
-          adminPw = pw; adminRole = role;
-          try { sessionStorage.setItem('adminPw', pw); sessionStorage.setItem('adminRole', role); } catch (e) {}
+          if (!data || data.role !== 'owner') { err.textContent = 'Wrong password'; return; }
+          adminPw = pw; adminRole = 'owner';
+          try { localStorage.setItem('ownerKey', pw); } catch (e) {}
           err.textContent = '';
           document.getElementById('pwModal').classList.remove('show');
-          openAdminPanel();
+          openProfit();
         })
         .catch(function() { err.textContent = 'Connection problem — try again'; });
     }
 
     function openAdminPanel() {
-      document.getElementById('profitBtn').style.display = adminRole === 'owner' ? '' : 'none';
       document.getElementById('adminPanel').classList.add('show');
       document.body.style.overflow = 'hidden';
       loadAdminOrders();
     }
 
-    function logoutAdmin() {
-      adminPw = ''; adminRole = '';
-      try { sessionStorage.removeItem('adminPw'); sessionStorage.removeItem('adminRole'); } catch (e) {}
+    // 隐藏入口：在后台长按标题「📊 All Orders」约 1.5 秒
+    var ownerHoldTimer = null;
+    function ownerHoldStart(e) {
+      clearTimeout(ownerHoldTimer);
+      ownerHoldTimer = setTimeout(function() {
+        ownerHoldTimer = null;
+        if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
+        if (adminRole === 'owner' && adminPw) openProfit();
+        else openOwnerLogin();
+      }, 1500);
+    }
+    function ownerHoldEnd() { clearTimeout(ownerHoldTimer); ownerHoldTimer = null; }
+
+    function forgetOwnerOnDevice() {
+      if (!confirm('在这台设备上退出？下次长按需要重新输入密码。')) return;
+      adminPw = ''; adminRole = 'admin';
+      try { localStorage.removeItem('ownerKey'); } catch (e) {}
       closeProfit();
-      closeAdmin();
-      showToast('🔒 Logged out', 1500);
+      showToast('已退出', 1500);
     }
 
     function closeAdmin() {
@@ -2601,6 +2609,13 @@
       fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=costs_get')
         .then(function(data) {
           if (!data || data.error) {
+            if (data && (data.error === 'Owner password required' || data.error === 'Wrong password')) {
+              // Password changed in Apps Script: forget the old one and ask again.
+              adminPw = ''; adminRole = 'admin';
+              try { localStorage.removeItem('ownerKey'); } catch (e) {}
+              closeProfit(); openOwnerLogin();
+              return;
+            }
             body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">⚠️ ' + escStr((data && data.error) || '读取失败') + '</div>';
             return;
           }
@@ -2663,6 +2678,7 @@
         '<button class="profit-tab' + (profitTab === 'costs' ? ' active' : '') + '" onclick="setProfitTab(\'costs\')">🏷 成本设置</button>' +
       '</div>';
       html += profitTab === 'costs' ? renderCostSettings() : renderPackageProfits();
+      html += '<div style="text-align:center;margin:18px 0 6px;"><button onclick="forgetOwnerOnDevice()" style="border:none;background:none;color:var(--text-light);font-size:12px;text-decoration:underline;cursor:pointer;">在这台设备上退出</button></div>';
       var scroll = body.scrollTop;
       body.innerHTML = html;
       body.scrollTop = scroll;
