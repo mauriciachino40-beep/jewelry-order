@@ -1,11 +1,15 @@
-// The back office needs no password (opened by tapping the logo 3 times).
-// Only the owner's hidden profit page is protected. Set it in Apps Script:
-//   Project Settings → Script Properties → OWNER_PASSWORD
-// It is NOT stored in this file because this repo is public.
+// Passwords are NOT stored in this file (this repo is public).
+// Set them in Apps Script: Project Settings → Script Properties:
+//   ADMIN_PASSWORD  — back-office password (Lisa and you; each device asks once)
+//   OWNER_PASSWORD  — owner-only; also opens the back office and the hidden profit page
 function getRole(password) {
-  var owner = PropertiesService.getScriptProperties().getProperty('OWNER_PASSWORD');
-  if (owner && password && password === owner) return 'owner';
-  return 'admin';
+  if (!password) return '';
+  var props = PropertiesService.getScriptProperties();
+  var owner = props.getProperty('OWNER_PASSWORD');
+  var admin = props.getProperty('ADMIN_PASSWORD');
+  if (owner && password === owner) return 'owner';
+  if (admin && password === admin) return 'admin';
+  return '';
 }
 
 function getOwnerSheet(name, headers) {
@@ -101,6 +105,9 @@ function doGet(e) {
   }
 
   var role = getRole(e.parameter.password);
+  if (!role) {
+    return json({ error: 'Wrong password' });
+  }
   if (action === 'role') {
     return json({ role: role });
   }

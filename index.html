@@ -2272,14 +2272,23 @@
     // ============================================================
     // ADMIN
     // ============================================================
-    // The back office opens with no password. Only the owner's hidden page uses a password,
-    // typed once per device and remembered there — it is never written into this public page.
+    // Passwords are typed once per device and remembered there (localStorage) —
+    // they are never written into this public page. Backend checks them.
     var adminPw = '';
-    var adminRole = 'admin';
+    var adminRole = '';
+    var pwMode = 'admin';   // 'admin' = open back office, 'owner' = open profit page
     try {
-      adminPw = localStorage.getItem('ownerKey') || '';
-      if (adminPw) adminRole = 'owner';
+      adminPw = localStorage.getItem('adminKey') || '';
+      adminRole = adminPw ? (localStorage.getItem('adminRole') || 'admin') : '';
     } catch (e) {}
+    function rememberLogin(pw, role) {
+      adminPw = pw; adminRole = role;
+      try { localStorage.setItem('adminKey', pw); localStorage.setItem('adminRole', role); } catch (e) {}
+    }
+    function forgetLogin() {
+      adminPw = ''; adminRole = '';
+      try { localStorage.removeItem('adminKey'); localStorage.removeItem('adminRole'); } catch (e) {}
+    }
     var ADMIN_URL = 'https://script.google.com/macros/s/AKfycbxcQ9zvwfOfaQzh6H_5hX5wh-YvJjhCreA7bpfr4bkxKC5dr57LKTDxj2UmPGoft7vVQg/exec';
     var brandTapCount = 0;
     var brandTapTimer = null;
@@ -2353,14 +2362,16 @@
       if (brandTapCount >= 3) {
         brandTapCount = 0;
         clearTimeout(brandTapTimer);
-        openAdminPanel();
+        if (adminPw) openAdminPanel();
+        else openPasswordBox('admin');
         return;
       }
       clearTimeout(brandTapTimer);
       brandTapTimer = setTimeout(function() { brandTapCount = 0; }, 1500);
     }
 
-    function openOwnerLogin() {
+    function openPasswordBox(mode) {
+      pwMode = mode;
       document.getElementById('pwInput').value = '';
       document.getElementById('pwError').textContent = '';
       document.getElementById('pwModal').classList.add('show');
@@ -2374,12 +2385,12 @@
       err.textContent = 'Checking…';
       fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(pw) + '&action=role')
         .then(function(data) {
-          if (!data || data.role !== 'owner') { err.textContent = 'Wrong password'; return; }
-          adminPw = pw; adminRole = 'owner';
-          try { localStorage.setItem('ownerKey', pw); } catch (e) {}
+          var role = data && data.role;
+          if (!role || (pwMode === 'owner' && role !== 'owner')) { err.textContent = 'Wrong password'; return; }
+          rememberLogin(pw, role);
           err.textContent = '';
           document.getElementById('pwModal').classList.remove('show');
-          openProfit();
+          if (pwMode === 'owner') openProfit(); else openAdminPanel();
         })
         .catch(function() { err.textContent = 'Connection problem — try again'; });
     }
@@ -2398,16 +2409,16 @@
         ownerHoldTimer = null;
         if (navigator.vibrate) { try { navigator.vibrate(30); } catch (err) {} }
         if (adminRole === 'owner' && adminPw) openProfit();
-        else openOwnerLogin();
+        else openPasswordBox('owner');
       }, 1500);
     }
     function ownerHoldEnd() { clearTimeout(ownerHoldTimer); ownerHoldTimer = null; }
 
     function forgetOwnerOnDevice() {
-      if (!confirm('在这台设备上退出？下次长按需要重新输入密码。')) return;
-      adminPw = ''; adminRole = 'admin';
-      try { localStorage.removeItem('ownerKey'); } catch (e) {}
+      if (!confirm('在这台设备上退出？下次进后台需要重新输入密码。')) return;
+      forgetLogin();
       closeProfit();
+      closeAdmin();
       showToast('已退出', 1500);
     }
 
@@ -2423,6 +2434,10 @@
 
       fetchJsonRetry(ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=list')
         .then(function(data) {
+          if (data.error === 'Wrong password') {
+            forgetLogin(); closeAdmin(); openPasswordBox('admin');
+            return;
+          }
           if (data.error) {
             body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">Error: ' + data.error + '</div>';
             return;
@@ -2611,9 +2626,10 @@
           if (!data || data.error) {
             if (data && (data.error === 'Owner password required' || data.error === 'Wrong password')) {
               // Password changed in Apps Script: forget the old one and ask again.
-              adminPw = ''; adminRole = 'admin';
-              try { localStorage.removeItem('ownerKey'); } catch (e) {}
-              closeProfit(); openOwnerLogin();
+              if (data.error === 'Wrong password') { forgetLogin(); closeProfit(); closeAdmin(); openPasswordBox('admin'); return; }
+              adminRole = 'admin';
+              try { localStorage.setItem('adminRole', 'admin'); } catch (e) {}
+              closeProfit(); openPasswordBox('owner');
               return;
             }
             body.innerHTML = '<div class="admin-loading" style="color:var(--danger)">⚠️ ' + escStr((data && data.error) || '读取失败') + '</div>';
