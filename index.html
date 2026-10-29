@@ -2595,7 +2595,11 @@
     var profitCosts = { items: {}, packages: {} };
     var profitTab = 'packages';
 
-    function money(n) { return (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2); }
+    // 利润页全部用人民币：订单收入(美元) × 汇率；汇率存在 owner 表格里，默认 6.5
+    var RATE_KEY = 'SETTING|USD_CNY';
+    function usdToCny() { var r = Number(profitCosts.items[RATE_KEY]); return r > 0 ? r : 6.5; }
+    function money(n) { return (n < 0 ? '-¥' : '¥') + Math.abs(n).toFixed(2); }
+    function usd(n) { return '$' + (Number(n) || 0).toFixed(2); }
     function variantText(it) {
       var order = ['Width', 'Color', 'Size'];
       return Object.keys(it.variants || {}).sort(function(a, b) {
@@ -2663,8 +2667,8 @@
             if (!it) return;
             var qty = Number(it.quantity) || 0;
             var regular = String(it.billingType || 'Regular') === 'Regular';
-            var income = regular ? (Number(it.billableSubtotal) || Number(it.subtotal) || (Number(it.price) || 0) * qty) : 0;
-            pkg.lines.push({ item: it, qty: qty, income: income, regular: regular });
+            var incomeUsd = regular ? (Number(it.billableSubtotal) || Number(it.subtotal) || (Number(it.price) || 0) * qty) : 0;
+            pkg.lines.push({ item: it, qty: qty, incomeUsd: incomeUsd, income: incomeUsd * usdToCny(), regular: regular });
           });
         });
       });
@@ -2714,10 +2718,12 @@
     function renderPackageProfits() {
       var pkgs = buildPackages();
       if (pkgs.length === 0) return '<div class="admin-loading">还没有发货记录。</div>';
-      var html = totalsHTML(pkgs);
+      var html = '<div class="profit-ship-row" style="margin:0 0 10px;">💱 汇率 1 美元 = ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" value="' + usdToCny() + '"' +
+        ' data-key="' + RATE_KEY + '" data-label="USD→CNY 汇率" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">订单美元收入按此换算</span></div>';
+      html += totalsHTML(pkgs);
       var incomplete = pkgs.filter(function(p) { return p.missing > 0; }).length;
       if (incomplete) html += '<div class="profit-warn">⚠️ ' + incomplete + ' 个包裹还缺成本或运费，利润偏高。到「🏷 成本设置」填商品成本，在包裹里填运费。</div>';
-      html += '<div style="font-size:11px;color:var(--text-light);margin-bottom:4px;">收入只算正常收费的商品；赠品/补偿收入为 $0，但成本照算。</div>';
+      html += '<div style="font-size:11px;color:var(--text-light);margin-bottom:4px;">全部以人民币计。收入只算正常收费的商品；赠品/补偿收入为 ¥0，但成本照算。</div>';
 
       var lastMonth = '';
       pkgs.forEach(function(p, n) {
@@ -2740,9 +2746,9 @@
           var costTxt = l.unit === null ? '<span class="profit-missing">成本未填</span>' : '成本 ' + money(l.unit * l.qty);
           html += '<div class="profit-line"><span class="profit-line-name">' + escStr(l.item.name) + (vt ? ' · ' + escStr(vt) : '') + ' ×' + l.qty +
             (l.regular ? '' : ' <span style="color:#805b12;">(' + escStr(getBillingLabel(l.item.billingType)) + ')</span>') + '</span>' +
-            '<span class="profit-line-nums">收入 ' + money(l.income) + '<br>' + costTxt + '</span></div>';
+            '<span class="profit-line-nums">收入 ' + money(l.income) + (l.incomeUsd ? ' <span style="font-size:10px;">(' + usd(l.incomeUsd) + ')</span>' : '') + '<br>' + costTxt + '</span></div>';
         });
-        html += '<div class="profit-ship-row">🚚 运费 $<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" value="' + (p.shipping === undefined ? '' : p.shipping) + '"' +
+        html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="未填" value="' + (p.shipping === undefined ? '' : p.shipping) + '"' +
             ' data-key="' + escStr(p.key) + '" data-label="' + escStr(p.tracking || '无单号 ' + (p.date || '')) + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
             (p.shipping === undefined ? '<span class="profit-missing">未填</span>' : '') + '</div>' +
           '<div class="profit-pkg-foot"><span>收入 ' + money(p.income) + ' − 成本 ' + money(p.cost) + '</span><span class="' + (p.profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(p.profit) + (p.missing ? ' *' : '') + '</span></div>' +
@@ -2763,7 +2769,7 @@
       });
       var names = Object.keys(products).sort();
       if (names.length === 0) return '<div class="admin-loading">还没有发货的商品。</div>';
-      var html = '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">填每件的成本价（美元）。所有规格成本一样就只填「默认」；某个规格不一样，再单独填那一行，会覆盖默认。改完点别处自动保存。</div>';
+      var html = '<div style="font-size:12px;color:var(--text-light);margin-bottom:6px;">填每件的成本价（人民币）。所有规格成本一样就只填「默认」；某个规格不一样，再单独填那一行，会覆盖默认。改完点别处自动保存。</div>';
       names.forEach(function(name) {
         var prod = products[name];
         var pKey = productCostKey(prod.sample);
@@ -2798,7 +2804,7 @@
         if (!data || data.error) { showToast('❌ ' + ((data && data.error) || '保存失败'), 3000); return; }
         profitCosts = { items: data.items || {}, packages: data.packages || {} };
         showToast('✅ 已保存', 1200);
-        if (profitTab === 'packages') renderProfit();
+        if (profitTab === 'packages' || key === RATE_KEY) renderProfit();
       }).catch(function() { input.disabled = false; showToast('❌ 网络中断，没保存', 3000); });
     }
 
