@@ -2602,14 +2602,15 @@
         var shippedTotal = fullySum + partialShippedSum + closedShippedSum;
 
         html += '<div class="summary-stat"><span class="summary-stat-label">✅ Fully shipped (' + fullyCount + ' orders)</span><span class="summary-stat-value">$' + fullySum.toFixed(2) + '</span></div>';
-        html += '<div class="summary-stat"><span class="summary-stat-label">🟠 Partially shipped (' + partialCount + ' orders · shipped portion)</span><span class="summary-stat-value">$' + partialShippedSum.toFixed(2) + '</span></div>';
+        html += '<div class="summary-stat"><span class="summary-stat-label">🟠 Partially shipped (' + partialCount + ' orders · shipped items only)</span><span class="summary-stat-value">$' + partialShippedSum.toFixed(2) + '</span></div>';
         if (partialCount > 0) {
-          html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ Still not shipped</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
+          html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ Not shipped yet — not billed</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
         }
         if (closedCount > 0) {
           html += '<div class="summary-stat"><span class="summary-stat-label">✔️ Closed (' + closedCount + ' orders · shipped portion, rest cancelled)</span><span class="summary-stat-value">$' + closedShippedSum.toFixed(2) + '</span></div>';
         }
         html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 Total shipped value</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
+        html += '<div style="font-size:12px;color:var(--text-light);padding:6px 0 2px;">ℹ️ Only items that have shipped are billed. Items not shipped yet are not charged until they ship.</div>';
         if (compensationCount > 0) {
           html += '<div class="summary-stat"><span class="summary-stat-label">🎁 Complimentary / replacement (' + compensationCount + ' orders, not billed)</span><span class="summary-stat-value" style="color:#805b12;">Ref. $' + compensationValue.toFixed(2) + '</span></div>';
         }
@@ -3040,6 +3041,8 @@
           '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
           '<div class="admin-order-total">' + (o['Status'] === 'Closed'
             ? '💰 Billed (shipped items): $' + closedShippedValue(o).toFixed(2) + ' <span style="font-size:11px;font-weight:500;color:var(--text-light);">· rest cancelled</span>'
+            : (o['Status'] !== 'Shipped' && st.shipped > 0 && st.shipped < st.total)
+            ? '💰 Billed so far (shipped): $' + closedShippedValue(o).toFixed(2) + '<div style="font-size:12px;font-weight:500;color:var(--text-light);margin-top:2px;">⏳ Not shipped yet: $' + Math.max(0, financials.billable - closedShippedValue(o)).toFixed(2) + ' (not billed yet)</div>'
             : '💰 Amount Due: $' + financials.billable.toFixed(2)) + (financials.complimentary > 0 ? ' <span style="font-size:11px;font-weight:500;color:#805b12;">· 🎁 Not billed: Ref. $' + financials.complimentary.toFixed(2) + '</span>' : '') + '</div>' +
           trackRowHTML +
           '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
