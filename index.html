@@ -1218,7 +1218,7 @@
           { name: 'Diamond Setting', options: ['Plain', 'Half Pavé', 'Full Pavé'] },
           { name: 'Style', options: ['Necklace', 'Bracelet'] },
           { name: 'Color', options: ['WG', 'YG', 'RG'] },
-          { name: 'Diamond', options: ['Pink', 'White'] }
+          { name: 'Diamond', options: ['Pink', 'White'], dependsOn: 'Diamond Setting', conditionalOptions: { 'Plain': [], 'Half Pavé': ['Pink', 'White'], 'Full Pavé': ['Pink', 'White'] } }
         ]
       },
 
