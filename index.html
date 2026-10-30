@@ -626,6 +626,14 @@
     }
     .pw-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
 
+    /* ========== Owner-only charge buttons in cart ========== */
+    .bill-seg { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .bill-seg-btn { flex: 1; min-width: 84px; padding: 8px 6px; border-radius: 10px; border: 1.5px solid var(--border); background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); }
+    .bill-seg-btn.on-Regular { background: #eef4ff; border-color: #1f6feb; color: #1f6feb; }
+    .bill-seg-btn.on-Gift { background: #fff8e8; border-color: #e0a526; color: #805b12; }
+    .bill-seg-btn.on-Compensation { background: #fdeef3; border-color: #d0567f; color: #9b2c55; }
+    .owner-cart-hint { background: #fff8e8; border: 1px solid #f1d28b; color: #805b12; border-radius: 10px; padding: 8px 10px; font-size: 12px; margin: 10px 16px 0; }
+
     /* ========== Owner profit modal ========== */
     .profit-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
     .profit-tab { flex: 1; padding: 8px; border: 1.5px solid var(--border); background: var(--bg); border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -1704,8 +1712,17 @@
       document.getElementById('cartSubtotal').textContent = `$${total.toFixed(2)}`;
       document.getElementById('cartSubtotalLabel').textContent = 'Amount Due';
       const compSummary = document.getElementById('cartComplimentarySummary');
+      const freeCount = cart.reduce((n, i) => n + (getItemBillingType(i) !== 'Regular' ? (Number(i.quantity) || 0) : 0), 0);
       compSummary.style.display = complimentaryTotal > 0 ? 'block' : 'none';
-      compSummary.textContent = complimentaryTotal > 0 ? `🎁 Complimentary items — not billed (ref. $${complimentaryTotal.toFixed(2)})` : '';
+      compSummary.textContent = complimentaryTotal > 0 ? `🎁 ${freeCount} complimentary item${freeCount === 1 ? '' : 's'} — not billed (ref. $${complimentaryTotal.toFixed(2)})` : '';
+      // 只在用 owner 密码登录过的设备上显示的提示
+      let ownerHint = document.getElementById('ownerCartHint');
+      if (!ownerHint) {
+        ownerHint = document.createElement('div'); ownerHint.id = 'ownerCartHint'; ownerHint.className = 'owner-cart-hint';
+        container.parentNode.insertBefore(ownerHint, container);
+      }
+      ownerHint.style.display = canCreateComplimentaryItems() && cart.length ? 'block' : 'none';
+      ownerHint.textContent = '🔑 你已登录：每件商品下面可以选 💲正常收费 / 🎁 Gift / ↩️ 补偿（只有你看得到）';
       document.getElementById('cartCheckoutBtn').disabled = cart.length === 0;
       document.getElementById('cartHoldBtn').disabled = cart.length === 0;
       renderOnHold();
@@ -1741,13 +1758,9 @@
               <div class="cart-item-name">${item.name}</div>
               <div class="cart-item-variants">${vt}</div>
               <div class="cart-item-price">${billingType === 'Regular' ? `$${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)}` : `Reference: $${item.price.toFixed(2)} × ${item.quantity} = $${(item.price*item.quantity).toFixed(2)} · $0 due`}</div>
-              ${canCreateComplimentaryItems() ? `<div style="margin-top:7px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                <span style="font-size:11px;color:var(--text-light);font-weight:600;">Charge:</span>
-                <select class="admin-status-select" onchange="updateCartItemBillingType(${item.cartItemId}, this.value)" style="font-size:11px;">
-                  <option value="Regular"${billingType === 'Regular' ? ' selected' : ''}>Regular order</option>
-                  <option value="Compensation"${billingType === 'Compensation' ? ' selected' : ''}>Compensation / replacement</option>
-                  <option value="Gift"${billingType === 'Gift' ? ' selected' : ''}>Gift</option>
-                </select>
+              ${canCreateComplimentaryItems() ? `<div class="bill-seg">
+                ${[['Regular', '💲 正常收费'], ['Gift', '🎁 Gift'], ['Compensation', '↩️ 补偿']].map(([t, label]) =>
+                  `<button type="button" class="bill-seg-btn${billingType === t ? ' on-' + t : ''}" onclick="updateCartItemBillingType(${item.cartItemId}, '${t}')">${label}</button>`).join('')}
               </div>` : ''}
               ${canCreateComplimentaryItems() ? getBillingBadgeHTML(item) : ''}
               ${billingDetails}
@@ -1911,7 +1924,8 @@
       document.getElementById('checkoutTotalLabel').textContent = 'Amount Due';
       const complimentarySummary = document.getElementById('checkoutComplimentarySummary');
       complimentarySummary.style.display = complimentaryTotal > 0 ? 'block' : 'none';
-      complimentarySummary.innerHTML = complimentaryTotal > 0 ? `<strong>🎁 Complimentary items — not included in customer's bill</strong><br>Reference value: $${complimentaryTotal.toFixed(2)} · The amount due above only includes regular items.` : '';
+      const freeCount = cart.reduce((n, i) => n + (getItemBillingType(i) !== 'Regular' ? (Number(i.quantity) || 0) : 0), 0);
+      complimentarySummary.innerHTML = complimentaryTotal > 0 ? `<strong>🎁 ${freeCount} complimentary item${freeCount === 1 ? '' : 's'} — not included in customer's bill</strong><br>Reference value: $${complimentaryTotal.toFixed(2)} · The amount due above only includes regular items.` : '';
     }
 
     function populateStates() {
