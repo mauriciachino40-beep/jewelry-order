@@ -1273,6 +1273,31 @@
           { name: 'Color', options: ['Yellow Gold', 'White Gold', 'Rose Gold'] },
           { name: 'Type', options: ['Clip', 'Stud'] }
         ]
+      },
+
+      // =====================================================
+      // 💎 TENNIS (1 product)
+      // 价格按材质：925 + Moissanite $53.50 / Normal (5A CZ) $22
+      // 尺码用英寸（美国习惯），石头只有 2mm
+      // =====================================================
+      {
+        id: 'tb1',
+        name: 'Tennis Bracelet',
+        price: 22.00,
+        image: './tb1.jpg',
+        category: 'Tennis',
+        variants: [
+          { name: 'Material', options: ['925 + Moissanite', 'Normal (5A CZ)'] },
+          { name: 'Size', options: ['5 inch', '5.5 inch', '6 inch', '6.5 inch', '7 inch', '7.5 inch'] },
+          { name: 'Stone Size', options: ['2mm'] }
+        ],
+        priceByVariant: {
+          name: 'Material',
+          pricing: {
+            '925 + Moissanite': 53.50,
+            'Normal (5A CZ)': 22.00
+          }
+        }
       }
 
     ];
@@ -2636,6 +2661,12 @@
     function unitCostFor(it) {
       var v = profitCosts.items[variantCostKey(it)];
       if (v !== undefined) return v;
+      var name = String(it.name || '').trim();
+      var vals = Object.keys(it.variants || {}).map(function(k) { return String(it.variants[k]); });
+      for (var i = 0; i < vals.length; i++) {
+        var o = profitCosts.items['A|' + name + '|' + vals[i]];
+        if (o !== undefined) return o;
+      }
       var p = profitCosts.items[productCostKey(it)];
       return p !== undefined ? p : null;
     }
