@@ -529,6 +529,7 @@
     .status-Processing { background: #fff3e0; color: #e65100; }
     .status-Shipped { background: #e8f5e9; color: #2e7d32; }
     .status-Cancelled { background: #fce4ec; color: #c62828; }
+    .status-Closed { background: #eceff1; color: #455a64; }
     .ship-badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; white-space: nowrap; }
     .ship-badge-partial { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
     .ship-badge-done { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
@@ -808,6 +809,7 @@
       <button class="admin-filter-tab" data-filter="Partial" onclick="filterAdminOrders('Partial')">🟠 Partial</button>
       <button class="admin-filter-tab" data-filter="Compensation" onclick="filterAdminOrders('Compensation')">🎁 Complimentary</button>
       <button class="admin-filter-tab" data-filter="Shipped" onclick="filterAdminOrders('Shipped')">📦 Shipped</button>
+      <button class="admin-filter-tab" data-filter="Closed" onclick="filterAdminOrders('Closed')">✔️ Closed</button>
       <button class="admin-filter-tab" data-filter="Cancelled" onclick="filterAdminOrders('Cancelled')">❌ Cancelled</button>
     </div>
     <div class="admin-body" id="adminBody">
@@ -2566,6 +2568,7 @@
       } else {
         var fullyCount = 0, fullySum = 0;
         var partialCount = 0, partialShippedSum = 0, partialRemainingSum = 0;
+        var closedCount = 0, closedShippedSum = 0;
         var compensationCount = 0, compensationValue = 0;
         orders.forEach(function(o) {
           var financials = getOrderFinancials(o);
@@ -2589,16 +2592,22 @@
           var total = financials.billable;
           if (status === 'Shipped' || (shippedN > 0 && shippedN === items.length)) {
             fullyCount++; fullySum += total;
+          } else if (shippedN > 0 && status === 'Closed') {
+            // Closed: shipped part is billed, the rest was cancelled (not "still to ship")
+            closedCount++; closedShippedSum += shippedVal;
           } else if (shippedN > 0) {
             partialCount++; partialShippedSum += shippedVal; partialRemainingSum += (total - shippedVal);
           }
         });
-        var shippedTotal = fullySum + partialShippedSum;
+        var shippedTotal = fullySum + partialShippedSum + closedShippedSum;
 
         html += '<div class="summary-stat"><span class="summary-stat-label">✅ Fully shipped (' + fullyCount + ' orders)</span><span class="summary-stat-value">$' + fullySum.toFixed(2) + '</span></div>';
         html += '<div class="summary-stat"><span class="summary-stat-label">🟠 Partially shipped (' + partialCount + ' orders · shipped portion)</span><span class="summary-stat-value">$' + partialShippedSum.toFixed(2) + '</span></div>';
         if (partialCount > 0) {
           html += '<div class="summary-stat"><span class="summary-stat-label" style="color:var(--text-light);padding-left:14px;">↳ Still not shipped</span><span class="summary-stat-value" style="color:var(--text-light);">$' + partialRemainingSum.toFixed(2) + '</span></div>';
+        }
+        if (closedCount > 0) {
+          html += '<div class="summary-stat"><span class="summary-stat-label">✔️ Closed (' + closedCount + ' orders · shipped portion, rest cancelled)</span><span class="summary-stat-value">$' + closedShippedSum.toFixed(2) + '</span></div>';
         }
         html += '<div class="summary-stat" style="border-top:2px solid var(--border);"><span class="summary-stat-label">📦 Total shipped value</span><span class="summary-stat-value">$' + shippedTotal.toFixed(2) + '</span></div>';
         if (compensationCount > 0) {
@@ -2927,7 +2936,7 @@
       } else if (filterStatus === 'Partial') {
         filtered = orders.filter(function(o) {
           var st = getShipmentStats(o);
-          return st.total > 0 && st.shipped > 0 && st.shipped < st.total;
+          return (o['Status'] || 'New') !== 'Closed' && st.total > 0 && st.shipped > 0 && st.shipped < st.total;
         });
       } else if (filterStatus && filterStatus !== 'All') {
         filtered = orders.filter(function(o) { return (o['Status'] || 'New') === filterStatus; });
@@ -2943,7 +2952,7 @@
         var s = o['Status'] || 'New';
         counts[s] = (counts[s] || 0) + 1;
         var st = getShipmentStats(o);
-        if (st.total > 0 && st.shipped > 0 && st.shipped < st.total) counts['Partial']++;
+        if (s !== 'Closed' && st.total > 0 && st.shipped > 0 && st.shipped < st.total) counts['Partial']++;
       });
       tabs.forEach(function(tab) {
         var key = tab.getAttribute('data-filter') || 'All';
@@ -2953,6 +2962,7 @@
         else if (key === 'Partial') tab.innerHTML = '🟠 Partial <span class="admin-filter-count">' + (counts['Partial'] || 0) + '</span>';
         else if (key === 'Compensation') tab.innerHTML = '🎁 Complimentary <span class="admin-filter-count">' + (counts['Compensation'] || 0) + '</span>';
         else if (key === 'Shipped') tab.innerHTML = '📦 Shipped <span class="admin-filter-count">' + (counts['Shipped'] || 0) + '</span>';
+        else if (key === 'Closed') tab.innerHTML = '✔️ Closed <span class="admin-filter-count">' + (counts['Closed'] || 0) + '</span>';
         else if (key === 'Cancelled') tab.innerHTML = '❌ Cancelled <span class="admin-filter-count">' + (counts['Cancelled'] || 0) + '</span>';
         tab.classList.toggle('active', key === (filterStatus || 'All'));
       });
@@ -2977,7 +2987,10 @@
         if (st.total > 0 && st.shipped > 0) {
           var partial = st.shipped < st.total;
           var cls = partial ? 'ship-badge-partial' : 'ship-badge-done';
-          var txt = partial ? ('📦 ' + st.shipped + '/' + st.total + ' shipped · ' + (st.total - st.shipped) + ' left') : ('📦 ' + st.shipped + '/' + st.total + ' shipped');
+          var txt = partial
+            ? ((o['Status'] === 'Closed') ? ('📦 ' + st.shipped + '/' + st.total + ' shipped · rest cancelled') : ('📦 ' + st.shipped + '/' + st.total + ' shipped · ' + (st.total - st.shipped) + ' left'))
+            : ('📦 ' + st.shipped + '/' + st.total + ' shipped');
+          if (partial && o['Status'] === 'Closed') cls = 'ship-badge-done';
           shipBadgeHTML = '<span class="ship-badge ' + cls + '">' + txt + '</span>';
         }
         // 卡片上直接显示物流按钮（每个不同单号一个），不用展开订单
@@ -3025,13 +3038,16 @@
           '</div>' +
           '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
           '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
-          '<div class="admin-order-total">💰 Amount Due: $' + financials.billable.toFixed(2) + (financials.complimentary > 0 ? ' <span style="font-size:11px;font-weight:500;color:#805b12;">· 🎁 Not billed: Ref. $' + financials.complimentary.toFixed(2) + '</span>' : '') + '</div>' +
+          '<div class="admin-order-total">' + (o['Status'] === 'Closed'
+            ? '💰 Billed (shipped items): $' + closedShippedValue(o).toFixed(2) + ' <span style="font-size:11px;font-weight:500;color:var(--text-light);">· rest cancelled</span>'
+            : '💰 Amount Due: $' + financials.billable.toFixed(2)) + (financials.complimentary > 0 ? ' <span style="font-size:11px;font-weight:500;color:#805b12;">· 🎁 Not billed: Ref. $' + financials.complimentary.toFixed(2) + '</span>' : '') + '</div>' +
           trackRowHTML +
           '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
             '<select class="admin-status-select" onchange="updateOrderStatus(' + o._row + ', this.value, ' + i + ')">' +
               '<option value="New"' + (o['Status'] === 'New' ? ' selected' : '') + '>New</option>' +
               '<option value="Processing"' + (o['Status'] === 'Processing' ? ' selected' : '') + '>Processing</option>' +
               '<option value="Shipped"' + (o['Status'] === 'Shipped' ? ' selected' : '') + '>Shipped</option>' +
+              '<option value="Closed"' + (o['Status'] === 'Closed' ? ' selected' : '') + '>Closed (rest cancelled)</option>' +
               '<option value="Cancelled"' + (o['Status'] === 'Cancelled' ? ' selected' : '') + '>Cancelled</option>' +
             '</select>' +
             '<div style="display:flex;gap:6px;">' +
@@ -3125,6 +3141,16 @@
 
     function escStr(s) {
       return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Closed 订单：只算已发出的正常收费商品
+    function closedShippedValue(o) {
+      var items = getStoredOrderItems(o), shipments = [];
+      try { shipments = o['Shipments'] ? JSON.parse(o['Shipments']) : []; } catch (e) { shipments = []; }
+      var sidx = {}; (Array.isArray(shipments) ? shipments : []).forEach(function(sh) { (sh.items || []).forEach(function(x) { sidx[x] = true; }); });
+      return items.reduce(function(sum, it, n) {
+        return sum + (sidx[n] && String(it.billingType || 'Regular') === 'Regular' ? (Number(it.billableSubtotal) || Number(it.subtotal) || 0) : 0);
+      }, 0);
     }
 
     function getShipmentStats(o) {
