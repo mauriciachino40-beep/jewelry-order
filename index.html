@@ -2607,9 +2607,20 @@
     function usdToCny() { var r = Number(profitCosts.items[RATE_KEY]); return r > 0 ? r : 6.5; }
     // 每个快递单号 = 一个包裹；没单独填运费的包裹按默认运费算（默认 ¥100，可改）
     var SHIP_KEY = 'SETTING|DEFAULT_SHIP';
-    var MISC_KEY = 'SETTING|MISC';
-    var UNTRACKED_KEY = 'U|untracked';
-    function miscCost() { return Number(profitCosts.items[MISC_KEY]) || 0; }
+    // 每包默认杂费（以后的包裹），默认 ¥30
+    var MISC_KEY = 'SETTING|DEFAULT_MISC';
+    function defaultMisc() { var v = profitCosts.items[MISC_KEY]; return v !== undefined && Number(v) >= 0 ? Number(v) : 30; }
+    // 2026-10-30 之前的所有发货（含标了 Shipped 但没有发货记录的订单）合成「历史 8 个包裹」
+    var HISTORY_BEFORE_MS = Date.UTC(2026, 9, 30, 2, 0);
+    var HISTORY_KEY = 'H|history';
+    var HISTORY_DEFAULTS = { packages: 8, ship: 680, misc: 200 };
+    function historySetting(field) { var v = profitCosts.packages[HISTORY_KEY + '|' + field]; return v !== undefined ? Number(v) : HISTORY_DEFAULTS[field]; }
+    function isHistoryShipment(sh) {
+      if (sh.untracked) return true;
+      var m = /^S(\d+)$/.exec(String(sh.id || ''));
+      if (m) return Number(m[1]) < HISTORY_BEFORE_MS;
+      return !sh.date || sh.date < '2026-10-30';
+    }
     function defaultShip() { var v = profitCosts.items[SHIP_KEY]; return v !== undefined && Number(v) >= 0 ? Number(v) : 100; }
     function money(n) { return (n < 0 ? '-¥' : '¥') + Math.abs(n).toFixed(2); }
     function usd(n) { return '$' + (Number(n) || 0).toFixed(2); }
@@ -2677,8 +2688,9 @@
           if (rest.length) shipments = shipments.concat([{ untracked: true, items: rest }]);
         }
         shipments.forEach(function(sh) {
-          var key = sh.untracked ? UNTRACKED_KEY : packageKey(sh);
-          var pkg = map[key] || (map[key] = { key: key, untracked: !!sh.untracked, tracking: String(sh.tracking || '').trim(), date: '', orders: {}, lines: [] });
+          var hist = isHistoryShipment(sh);
+          var key = hist ? HISTORY_KEY : packageKey(sh);
+          var pkg = map[key] || (map[key] = { key: key, history: hist, tracking: hist ? '' : String(sh.tracking || '').trim(), date: '', orders: {}, lines: [] });
           if (sh.date && (!pkg.date || sh.date < pkg.date)) pkg.date = sh.date;
           pkg.orders[o['Order ID'] || ('row ' + o._row)] = o['Customer Name'] || '';
           (sh.items || []).forEach(function(idx) {
@@ -2699,10 +2711,19 @@
           if (u === null) missing++; else cost += u * l.qty;
           income += l.income;
         });
-        pkg.shippingSet = profitCosts.packages[pkg.key] !== undefined;
-        // 无发货记录那一批可能包含好几次寄件，运费不按默认算，由你填这批合计
-        pkg.shipping = pkg.shippingSet ? profitCosts.packages[pkg.key] : (pkg.untracked ? 0 : defaultShip());
-        cost += pkg.shipping;
+        if (pkg.history) {
+          pkg.count = historySetting('packages');
+          pkg.shipping = historySetting('ship');
+          pkg.misc = historySetting('misc');
+        } else {
+          pkg.count = 1;
+          pkg.shippingSet = profitCosts.packages[pkg.key] !== undefined;
+          pkg.shipping = pkg.shippingSet ? profitCosts.packages[pkg.key] : defaultShip();
+          pkg.miscSet = profitCosts.packages['M|' + pkg.key] !== undefined;
+          pkg.misc = pkg.miscSet ? profitCosts.packages['M|' + pkg.key] : defaultMisc();
+        }
+        pkg.goods = cost;
+        cost += pkg.shipping + pkg.misc;
         pkg.income = income; pkg.cost = cost; pkg.missing = missing; pkg.profit = income - cost;
         return pkg;
       }).sort(function(a, b) { return (b.date || '') < (a.date || '') ? -1 : (b.date || '') > (a.date || '') ? 1 : 0; });
@@ -2728,7 +2749,6 @@
     function totalsHTML(list) {
       var inc = 0, cost = 0;
       list.forEach(function(p) { inc += p.income; cost += p.cost; });
-      cost += miscCost();
       var profit = inc - cost;
       return '<div class="profit-totals">' +
         '<div class="profit-total"><div class="profit-total-label">收入</div><div class="profit-total-value">' + money(inc) + '</div></div>' +
@@ -2744,8 +2764,8 @@
         ' data-key="' + RATE_KEY + '" data-label="USD→CNY 汇率" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">订单美元收入按此换算</span></div>';
       html += '<div class="profit-ship-row" style="margin:0 0 10px;">🚚 默认每包运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" value="' + defaultShip() + '"' +
         ' data-key="' + SHIP_KEY + '" data-label="默认每包运费" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">每个快递单号算一个包裹</span></div>';
-      html += '<div class="profit-ship-row" style="margin:0 0 10px;">🧾 其他杂费合计 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + (profitCosts.items[MISC_KEY] !== undefined ? profitCosts.items[MISC_KEY] : '') + '"' +
-        ' data-key="' + MISC_KEY + '" data-label="其他杂费合计" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">计入总成本</span></div>';
+      html += '<div class="profit-ship-row" style="margin:0 0 10px;">🧾 默认每包杂费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" value="' + defaultMisc() + '"' +
+        ' data-key="' + MISC_KEY + '" data-label="默认每包杂费" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">以后每个包裹都按此算</span></div>';
       html += totalsHTML(pkgs);
       var incomplete = pkgs.filter(function(p) { return p.missing > 0; }).length;
       if (incomplete) html += '<div class="profit-warn">⚠️ ' + incomplete + ' 个包裹还有商品没填成本，利润偏高。到「🏷 成本设置」补上。</div>';
@@ -2753,16 +2773,18 @@
 
       var lastMonth = '';
       pkgs.forEach(function(p, n) {
-        var month = (p.date || '').slice(0, 7) || '早期 / 无发货日期';
+        var monthOf = function(x) { return x.history ? '历史（10/30 以前）' : ((x.date || '').slice(0, 7) || '无日期'); };
+        var month = monthOf(p);
         if (month !== lastMonth) {
           lastMonth = month;
-          var inMonth = pkgs.filter(function(x) { return ((x.date || '').slice(0, 7) || '早期 / 无发货日期') === month; });
+          var inMonth = pkgs.filter(function(x) { return monthOf(x) === month; });
+          var inMonthCount = inMonth.reduce(function(a, x) { return a + (x.count || 1); }, 0);
           var mProfit = inMonth.reduce(function(a, x) { return a + x.profit; }, 0);
-          html += '<div class="profit-month"><span>' + escStr(month) + ' · ' + inMonth.length + ' 个包裹</span><span class="' + (mProfit < 0 ? 'profit-neg' : 'profit-pos') + '">利润 ' + money(mProfit) + '</span></div>';
+          html += '<div class="profit-month"><span>' + escStr(month) + ' · ' + inMonthCount + ' 个包裹</span><span class="' + (mProfit < 0 ? 'profit-neg' : 'profit-pos') + '">利润 ' + money(mProfit) + '</span></div>';
         }
         var orderIds = Object.keys(p.orders);
-        var title = p.untracked
-          ? '<span>📁 早期已发货（标了 Shipped，没有发货记录）</span>'
+        var title = p.history
+          ? '<span>📁 历史包裹（10/30 以前，共 ' + p.count + ' 个）</span>'
           : p.tracking
           ? '<a href="' + trackingUrl(p.tracking) + '" target="_blank" rel="noopener noreferrer" style="color:#1f6feb;">' + escStr(p.tracking) + ' ↗</a>'
           : '<span style="color:var(--text-light);">无单号</span>';
@@ -2776,10 +2798,22 @@
             (l.regular ? '' : ' <span style="color:#805b12;">(' + escStr(getBillingLabel(l.item.billingType)) + ')</span>') + '</span>' +
             '<span class="profit-line-nums">收入 ' + money(l.income) + (l.incomeUsd ? ' <span style="font-size:10px;">(' + usd(l.incomeUsd) + ')</span>' : '') + '<br>' + costTxt + '</span></div>';
         });
-        html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + (p.untracked ? '这批运费合计' : defaultShip() + '（默认）') + '" value="' + (p.shippingSet ? p.shipping : '') + '"' +
-            ' data-key="' + escStr(p.key) + '" data-label="' + escStr(p.tracking || '无单号 ' + (p.date || '')) + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
-            (p.shippingSet ? '' : p.untracked ? '<span class="profit-missing">填这批所有包裹的运费合计</span>' : '<span style="color:var(--text-light);">按默认，不同就改</span>') + '</div>' +
-          '<div class="profit-pkg-foot"><span>收入 ' + money(p.income) + ' − 成本 ' + money(p.cost) + '</span><span class="' + (p.profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(p.profit) + (p.missing ? ' *' : '') + '</span></div>' +
+        if (p.history) {
+          var hRow = function(field, label, hint) {
+            return '<div class="profit-ship-row">' + label + '<input class="profit-input" type="number" min="0" step="' + (field === 'packages' ? '1' : '0.01') + '" inputmode="decimal" value="' + historySetting(field) + '"' +
+              ' data-key="' + HISTORY_KEY + '|' + field + '" data-label="历史包裹 ' + field + '" onchange="saveProfitCost(\'pkg_set\', this)"><span style="color:var(--text-light);">' + hint + '</span></div>';
+          };
+          html += hRow('packages', '📦 包裹数 ', '个') + hRow('ship', '🚚 运费合计 ¥', '') + hRow('misc', '🧾 杂费合计 ¥', '');
+        } else {
+          var pkgLabel = escStr(p.tracking || '无单号 ' + (p.date || ''));
+          html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + defaultShip() + '" value="' + (p.shippingSet ? p.shipping : '') + '"' +
+              ' data-key="' + escStr(p.key) + '" data-label="' + pkgLabel + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
+              (p.shippingSet ? '' : '<span style="color:var(--text-light);">按默认，不同就改</span>') + '</div>' +
+            '<div class="profit-ship-row">🧾 杂费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + defaultMisc() + '" value="' + (p.miscSet ? p.misc : '') + '"' +
+              ' data-key="M|' + escStr(p.key) + '" data-label="杂费 ' + pkgLabel + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
+              (p.miscSet ? '' : '<span style="color:var(--text-light);">按默认，不同就改</span>') + '</div>';
+        }
+        html += '<div class="profit-pkg-foot"><span>收入 ' + money(p.income) + ' − 商品 ' + money(p.goods) + ' − 运费 ' + money(p.shipping) + ' − 杂费 ' + money(p.misc) + '</span><span class="' + (p.profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(p.profit) + (p.missing ? ' *' : '') + '</span></div>' +
         '</div>';
       });
       return html;
@@ -3129,9 +3163,9 @@
           '<button class="admin-ship-btn" onclick="showShipForm(' + i + ')">📦 Ship Selected</button>' +
         '</div>' +
         '<div id="adminShipForm' + i + '" style="display:none;margin-top:8px;padding:10px;background:#f5f7fa;border-radius:6px;">' +
-          '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">📦 填写发货信息（均可选）</div>' +
+          '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">📦 填写发货信息（单号必填，同一个箱子填同一个单号）</div>' +
           '<div style="display:flex;gap:6px;margin-bottom:6px;">' +
-            '<input id="adminShipTracking' + i + '" placeholder="单号 / Tracking" style="flex:1;min-width:0;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;">' +
+            '<input id="adminShipTracking' + i + '" placeholder="单号 / Tracking（必填）" style="flex:1;min-width:0;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;box-sizing:border-box;">' +
             '<button type="button" onclick="openTrackingFromInput(' + i + ')" style="flex-shrink:0;padding:7px 10px;border:none;border-radius:6px;background:#1f6feb;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">🔍 查物流</button>' +
           '</div>' +
           '<input id="adminShipNote' + i + '" placeholder="备注（如：第二包，周末寄）" style="width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:8px;box-sizing:border-box;">' +
@@ -3165,6 +3199,7 @@
       var o = window._adminOrders[i];
       if (!o) return;
       var tracking = document.getElementById('adminShipTracking' + i).value.trim();
+      if (!tracking) { showToast('⚠️ 请先填写物流单号', 2500); document.getElementById('adminShipTracking' + i).focus(); return; }
       var note = document.getElementById('adminShipNote' + i).value.trim();
       var url = ADMIN_URL + '?password=' + encodeURIComponent(adminPw) + '&action=ship&row=' + o._row + '&items=' + idxs.join(',') +
         '&tracking=' + encodeURIComponent(tracking) + '&note=' + encodeURIComponent(note);

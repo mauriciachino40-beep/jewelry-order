@@ -222,7 +222,8 @@ function doGet(e) {
   if (action === 'ship') {
     var row = parseInt(e.parameter.row);
     var itemsParam = e.parameter.items || '';
-    var tracking = e.parameter.tracking || '';
+    var tracking = String(e.parameter.tracking || '').trim();
+    if (!tracking) return json({ success: false, error: 'Tracking number required' });
     var note = e.parameter.note || '';
     if (!row || !itemsParam) return json({ error: 'Missing row or items' });
     var items = itemsParam.split(',').map(function(s) { return parseInt(s, 10); }).filter(function(n) { return !isNaN(n); });
