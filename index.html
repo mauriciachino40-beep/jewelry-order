@@ -2607,6 +2607,9 @@
     function usdToCny() { var r = Number(profitCosts.items[RATE_KEY]); return r > 0 ? r : 6.5; }
     // 每个快递单号 = 一个包裹；没单独填运费的包裹按默认运费算（默认 ¥100，可改）
     var SHIP_KEY = 'SETTING|DEFAULT_SHIP';
+    var MISC_KEY = 'SETTING|MISC';
+    var UNTRACKED_KEY = 'U|untracked';
+    function miscCost() { return Number(profitCosts.items[MISC_KEY]) || 0; }
     function defaultShip() { var v = profitCosts.items[SHIP_KEY]; return v !== undefined && Number(v) >= 0 ? Number(v) : 100; }
     function money(n) { return (n < 0 ? '-¥' : '¥') + Math.abs(n).toFixed(2); }
     function usd(n) { return '$' + (Number(n) || 0).toFixed(2); }
@@ -2666,10 +2669,16 @@
         var items = getStoredOrderItems(o);
         var shipments = [];
         try { shipments = o['Shipments'] ? JSON.parse(o['Shipments']) : []; } catch (e) { shipments = []; }
-        if (!Array.isArray(shipments)) return;
+        if (!Array.isArray(shipments)) shipments = [];
+        var covered = {};
+        shipments.forEach(function(sh) { (sh.items || []).forEach(function(x) { covered[x] = true; }); });
+        if ((o['Status'] || 'New') === 'Shipped') {
+          var rest = items.map(function(it, n) { return n; }).filter(function(n) { return !covered[n]; });
+          if (rest.length) shipments = shipments.concat([{ untracked: true, items: rest }]);
+        }
         shipments.forEach(function(sh) {
-          var key = packageKey(sh);
-          var pkg = map[key] || (map[key] = { key: key, tracking: String(sh.tracking || '').trim(), date: '', orders: {}, lines: [] });
+          var key = sh.untracked ? UNTRACKED_KEY : packageKey(sh);
+          var pkg = map[key] || (map[key] = { key: key, untracked: !!sh.untracked, tracking: String(sh.tracking || '').trim(), date: '', orders: {}, lines: [] });
           if (sh.date && (!pkg.date || sh.date < pkg.date)) pkg.date = sh.date;
           pkg.orders[o['Order ID'] || ('row ' + o._row)] = o['Customer Name'] || '';
           (sh.items || []).forEach(function(idx) {
@@ -2691,7 +2700,8 @@
           income += l.income;
         });
         pkg.shippingSet = profitCosts.packages[pkg.key] !== undefined;
-        pkg.shipping = pkg.shippingSet ? profitCosts.packages[pkg.key] : defaultShip();
+        // 无发货记录那一批可能包含好几次寄件，运费不按默认算，由你填这批合计
+        pkg.shipping = pkg.shippingSet ? profitCosts.packages[pkg.key] : (pkg.untracked ? 0 : defaultShip());
         cost += pkg.shipping;
         pkg.income = income; pkg.cost = cost; pkg.missing = missing; pkg.profit = income - cost;
         return pkg;
@@ -2718,6 +2728,7 @@
     function totalsHTML(list) {
       var inc = 0, cost = 0;
       list.forEach(function(p) { inc += p.income; cost += p.cost; });
+      cost += miscCost();
       var profit = inc - cost;
       return '<div class="profit-totals">' +
         '<div class="profit-total"><div class="profit-total-label">收入</div><div class="profit-total-value">' + money(inc) + '</div></div>' +
@@ -2733,6 +2744,8 @@
         ' data-key="' + RATE_KEY + '" data-label="USD→CNY 汇率" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">订单美元收入按此换算</span></div>';
       html += '<div class="profit-ship-row" style="margin:0 0 10px;">🚚 默认每包运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" value="' + defaultShip() + '"' +
         ' data-key="' + SHIP_KEY + '" data-label="默认每包运费" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">每个快递单号算一个包裹</span></div>';
+      html += '<div class="profit-ship-row" style="margin:0 0 10px;">🧾 其他杂费合计 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0" value="' + (profitCosts.items[MISC_KEY] !== undefined ? profitCosts.items[MISC_KEY] : '') + '"' +
+        ' data-key="' + MISC_KEY + '" data-label="其他杂费合计" onchange="saveProfitCost(\'cost_set\', this)"><span style="color:var(--text-light);">计入总成本</span></div>';
       html += totalsHTML(pkgs);
       var incomplete = pkgs.filter(function(p) { return p.missing > 0; }).length;
       if (incomplete) html += '<div class="profit-warn">⚠️ ' + incomplete + ' 个包裹还有商品没填成本，利润偏高。到「🏷 成本设置」补上。</div>';
@@ -2740,15 +2753,17 @@
 
       var lastMonth = '';
       pkgs.forEach(function(p, n) {
-        var month = (p.date || '').slice(0, 7) || '无日期';
+        var month = (p.date || '').slice(0, 7) || '早期 / 无发货日期';
         if (month !== lastMonth) {
           lastMonth = month;
-          var inMonth = pkgs.filter(function(x) { return ((x.date || '').slice(0, 7) || '无日期') === month; });
+          var inMonth = pkgs.filter(function(x) { return ((x.date || '').slice(0, 7) || '早期 / 无发货日期') === month; });
           var mProfit = inMonth.reduce(function(a, x) { return a + x.profit; }, 0);
           html += '<div class="profit-month"><span>' + escStr(month) + ' · ' + inMonth.length + ' 个包裹</span><span class="' + (mProfit < 0 ? 'profit-neg' : 'profit-pos') + '">利润 ' + money(mProfit) + '</span></div>';
         }
         var orderIds = Object.keys(p.orders);
-        var title = p.tracking
+        var title = p.untracked
+          ? '<span>📁 早期已发货（标了 Shipped，没有发货记录）</span>'
+          : p.tracking
           ? '<a href="' + trackingUrl(p.tracking) + '" target="_blank" rel="noopener noreferrer" style="color:#1f6feb;">' + escStr(p.tracking) + ' ↗</a>'
           : '<span style="color:var(--text-light);">无单号</span>';
         html += '<div class="profit-pkg">' +
@@ -2761,9 +2776,9 @@
             (l.regular ? '' : ' <span style="color:#805b12;">(' + escStr(getBillingLabel(l.item.billingType)) + ')</span>') + '</span>' +
             '<span class="profit-line-nums">收入 ' + money(l.income) + (l.incomeUsd ? ' <span style="font-size:10px;">(' + usd(l.incomeUsd) + ')</span>' : '') + '<br>' + costTxt + '</span></div>';
         });
-        html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + defaultShip() + '（默认）" value="' + (p.shippingSet ? p.shipping : '') + '"' +
+        html += '<div class="profit-ship-row">🚚 运费 ¥<input class="profit-input" type="number" min="0" step="0.01" inputmode="decimal" placeholder="' + (p.untracked ? '这批运费合计' : defaultShip() + '（默认）') + '" value="' + (p.shippingSet ? p.shipping : '') + '"' +
             ' data-key="' + escStr(p.key) + '" data-label="' + escStr(p.tracking || '无单号 ' + (p.date || '')) + '" onchange="saveProfitCost(\'pkg_set\', this)">' +
-            (p.shippingSet ? '' : '<span style="color:var(--text-light);">按默认，不同就改</span>') + '</div>' +
+            (p.shippingSet ? '' : p.untracked ? '<span class="profit-missing">填这批所有包裹的运费合计</span>' : '<span style="color:var(--text-light);">按默认，不同就改</span>') + '</div>' +
           '<div class="profit-pkg-foot"><span>收入 ' + money(p.income) + ' − 成本 ' + money(p.cost) + '</span><span class="' + (p.profit < 0 ? 'profit-neg' : 'profit-pos') + '">' + money(p.profit) + (p.missing ? ' *' : '') + '</span></div>' +
         '</div>';
       });
@@ -2817,7 +2832,7 @@
         if (!data || data.error) { showToast('❌ ' + ((data && data.error) || '保存失败'), 3000); return; }
         profitCosts = { items: data.items || {}, packages: data.packages || {} };
         showToast('✅ 已保存', 1200);
-        if (profitTab === 'packages' || key === RATE_KEY || key === SHIP_KEY) renderProfit();
+        if (profitTab === 'packages' || key === RATE_KEY || key === SHIP_KEY || key === MISC_KEY) renderProfit();
       }).catch(function() { input.disabled = false; showToast('❌ 网络中断，没保存', 3000); });
     }
 
