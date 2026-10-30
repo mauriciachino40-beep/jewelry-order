@@ -626,6 +626,10 @@
     }
     .pw-error { color: var(--danger); font-size: 13px; margin-top: 8px; }
 
+    /* ========== Track buttons on order cards ========== */
+    .card-track-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+    .card-track-btn { display: inline-block; padding: 6px 10px; border-radius: 8px; background: #1f6feb; color: #fff; text-decoration: none; font-size: 12px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     /* ========== Owner-only charge buttons in cart ========== */
     .bill-seg { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
     .bill-seg-btn { flex: 1; min-width: 84px; padding: 8px 6px; border-radius: 10px; border: 1.5px solid var(--border); background: #fff; font-size: 13px; font-weight: 700; cursor: pointer; color: var(--text); }
@@ -2976,6 +2980,22 @@
           var txt = partial ? ('📦 ' + st.shipped + '/' + st.total + ' shipped · ' + (st.total - st.shipped) + ' left') : ('📦 ' + st.shipped + '/' + st.total + ' shipped');
           shipBadgeHTML = '<span class="ship-badge ' + cls + '">' + txt + '</span>';
         }
+        // 卡片上直接显示物流按钮（每个不同单号一个），不用展开订单
+        var cardShipments = [];
+        try { cardShipments = o['Shipments'] ? JSON.parse(o['Shipments']) : []; } catch (e) { cardShipments = []; }
+        if (!Array.isArray(cardShipments)) cardShipments = [];
+        var seenTracking = {};
+        var trackButtons = cardShipments.filter(function(sh) {
+          var t = String(sh.tracking || '').trim();
+          if (!t || seenTracking[t.toUpperCase()]) return false;
+          seenTracking[t.toUpperCase()] = true; return true;
+        }).map(function(sh) {
+          var t = String(sh.tracking).trim();
+          return '<a class="card-track-btn" href="' + trackingUrl(t) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">🔍 Track ' + escStr(t) + ' ↗</a>';
+        }).join('');
+        var trackRowHTML = trackButtons
+          ? '<div class="card-track-row">' + trackButtons + '</div>'
+          : ((o['Status'] || '') === 'Shipped' ? '<div class="card-track-row"><span style="font-size:12px;color:var(--text-light);">📦 No tracking number on file</span></div>' : '');
         var compensationBadgeHTML = complimentaryItems.length ? '<span class="ship-badge" style="background:#fff8e8;color:#805b12;border:1px solid #f1d28b;">🎁 Has complimentary items</span>' : '';
         var relatedCompensations = [];
         orders.forEach(function(candidate) {
@@ -3006,6 +3026,7 @@
           '<div class="admin-order-date">' + o['Date (ET)'] + '</div>' +
           '<div class="admin-order-customer">👤 ' + o['Customer Name'] + '</div>' +
           '<div class="admin-order-total">💰 Amount Due: $' + financials.billable.toFixed(2) + (financials.complimentary > 0 ? ' <span style="font-size:11px;font-weight:500;color:#805b12;">· 🎁 Not billed: Ref. $' + financials.complimentary.toFixed(2) + '</span>' : '') + '</div>' +
+          trackRowHTML +
           '<div class="admin-order-bottom" onclick="event.stopPropagation()">' +
             '<select class="admin-status-select" onchange="updateOrderStatus(' + o._row + ', this.value, ' + i + ')">' +
               '<option value="New"' + (o['Status'] === 'New' ? ' selected' : '') + '>New</option>' +
