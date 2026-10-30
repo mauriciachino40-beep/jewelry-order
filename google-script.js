@@ -295,6 +295,22 @@ function doPost(e) {
       return json({ success: false, error: 'No data received' });
     }
     var data = JSON.parse(raw);
+
+    // Gift / Compensation (no charge) is allowed only with the owner password.
+    // Otherwise those items are billed as Regular, so nobody can make items free by picking a name.
+    var ownerOk = getRole(data.ownerKey) === 'owner';
+    delete data.ownerKey;
+    if (!ownerOk && Array.isArray(data.items) && data.items.some(function(i) { return (i.billingType || 'Regular') !== 'Regular'; })) {
+      var billed = 0;
+      data.items.forEach(function(i) {
+        var line = Number(i.subtotal) || (Number(i.price) || 0) * (Number(i.quantity) || 0);
+        i.billingType = 'Regular'; i.billableSubtotal = line; i.relatedOrderId = ''; i.compensationReason = ''; i.giftNote = '';
+        billed += line;
+      });
+      data.total = billed; data.referenceTotal = billed; data.complimentaryTotal = 0;
+      data.orderType = 'Standard'; data.relatedOrderId = ''; data.compensationReason = '';
+      data.notes = (data.notes ? data.notes + ' ' : '') + '[No-charge items were billed: not authorized]';
+    }
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName('Orders');
 
